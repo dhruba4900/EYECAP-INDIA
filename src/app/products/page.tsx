@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { Suspense, useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Search, Filter, SlidersHorizontal, ArrowUpDown, X, Sparkles } from "lucide-react";
 import ProductCard from "@/components/shop/ProductCard";
 import { formatCurrency } from "@/lib/utils";
 
-export default function ProductsPage() {
+function ProductsCatalog() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -287,5 +287,13 @@ export default function ProductsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ProductsPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen" aria-busy="true" />}>
+      <ProductsCatalog />
+    </Suspense>
   );
 }

@@ -3,15 +3,16 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "prisma:generate": "prisma generate",
-    "prisma:push": "prisma db push",
-    "prisma:seed": "node --env-file-if-exists=.env scripts/seed.mjs",
-    "setup": "npm run prisma:generate && npm run prisma:push && npm run prisma:seed",
-    "test:flow": "node --env-file-if-exists=.env scripts/test-e2e-workflow.mjs"
+  "dev": "next dev",
+  "build": "prisma generate && next build",
+  "start": "next start",
+  "lint": "next lint",
+  "postinstall": "prisma generate",
+  "prisma:generate": "prisma generate",
+  "prisma:push": "prisma db push",
+  "prisma:seed": "node --env-file-if-exists=.env scripts/seed.mjs",
+  "setup": "npm run prisma:generate && npm run prisma:push && npm run prisma:seed",
+  "test:flow": "node --env-file-if-exists=.env scripts/test-e2e-workflow.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1144.0",

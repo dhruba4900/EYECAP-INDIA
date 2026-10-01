@@ -1,0 +1,522 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// -------------------------------------------------------------
+// USER & IDENTITY
+// -------------------------------------------------------------
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String
+  role          String    @default("CUSTOMER") // CUSTOMER | ADMIN | DELIVERY_PARTNER
+  firstName     String
+  lastName      String
+  phone         String?
+  avatarUrl     String?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  customerProfile  CustomerProfile?
+  adminProfile     AdminProfile?
+  deliveryPartner  DeliveryPartner?
+
+  addresses        Address[]
+  orders           Order[]
+  cart             Cart?
+  wishlistItems    Wishlist[]
+  reviews          Review[]
+  notifications    Notification[]
+  auditLogs        AuditLog[]
+}
+
+model CustomerProfile {
+  id                   String   @id @default(uuid())
+  userId               String   @unique
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  loyaltyPoints        Int      @default(100)
+  prescriptionType     String?  // Single Vision, Progressive, Non-Prescription, BlueLight
+  odSphere             Float?
+  osSphere             Float?
+  pupillaryDistance    Float?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model AdminProfile {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  department   String   @default("Executive Operations")
+  isSuperAdmin Boolean  @default(false)
+  accessLevel  Int      @default(10)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model DeliveryPartner {
+  id              String     @id @default(uuid())
+  userId          String     @unique
+  user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicleType     String     @default("Motorcycle") // Motorcycle, Van, EV Bicycle
+  vehiclePlate    String     @default("EYE-2026-X")
+  isAvailable     Boolean    @default(true)
+  currentZone     String     @default("Metropolitan Downtown")
+  rating          Float      @default(4.9)
+  totalDeliveries Int        @default(0)
+  deliveries      Delivery[]
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+}
+
+// -------------------------------------------------------------
+// CATALOG & PRODUCTS
+// -------------------------------------------------------------
+model Category {
+  id           String    @id @default(uuid())
+  name         String    @unique
+  slug         String    @unique
+  description  String?
+  bannerImage  String?
+  displayOrder Int       @default(0)
+  products     Product[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Product {
+  id             String           @id @default(uuid())
+  name           String
+  slug           String           @unique
+  headline       String?
+  description    String
+  basePrice      Float
+  comparePrice   Float?
+  sku            String           @unique
+  categoryId     String
+  category       Category         @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  isFeatured     Boolean          @default(false)
+  isNew          Boolean          @default(false)
+  isPublished    Boolean          @default(true)
+  
+  // Eyewear specifications
+  frameShape     String           @default("Geometric") // Aviator, Rectangular, Round, Geometric, Cat-Eye
+  frameMaterial  String           @default("Grade 5 Titanium")
+  lensMaterial   String           @default("Polycarbonate UV400 Polarized")
+  lensWidthMm    Int              @default(53)
+  bridgeWidthMm  Int              @default(18)
+  templeLengthMm Int              @default(145)
+  totalWeightG   Int              @default(18)
+  genderStyle    String           @default("Unisex")
+  
+  rating         Float            @default(4.8)
+  reviewCount    Int              @default(0)
+  
+  variants       ProductVariant[]
+  images         ProductImage[]
+  model3d        ProductModel3D?
+  inventory      Inventory?
+  orderItems     OrderItem[]
+  cartItems      CartItem[]
+  wishlistItems  Wishlist[]
+  reviews        Review[]
+  modelAssets    ProductModelAsset[]
+  
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+}
+
+model ProductVariant {
+  id              String      @id @default(uuid())
+  productId       String
+  product         Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name            String
+  colorName       String
+  colorHex        String
+  size            String      @default("Standard")
+  sku             String      @unique
+  priceAdjustment Float       @default(0.0)
+  imageUrl        String?
+  
+  orderItems      OrderItem[]
+  cartItems       CartItem[]
+  inventory       Inventory?
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+model ProductImage {
+  id           String   @id @default(uuid())
+  productId    String
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url          String
+  alt          String?
+  displayOrder Int      @default(0)
+  isPrimary    Boolean  @default(false)
+}
+
+model ProductModel3D {
+  id              String   @id @default(uuid())
+  productId       String   @unique
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  assetId         String?  @unique
+  asset           ProductModelAsset? @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  modelUrl        String?  // GLTF/GLB or procedural generator key
+  posterUrl       String
+  modelType       String   @default("titanium_sleek") // procedural 3D model archetype: aviator, geometric, rectangular, smart_audio
+  lensColor       String   @default("#1E293B")
+  frameColor      String   @default("#383B42")
+  metalness       Float    @default(0.85)
+  roughness       Float    @default(0.20)
+  transmission    Float    @default(0.60)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model ProductModelAsset {
+  id            String       @id @default(uuid())
+  productId     String
+  product       Product      @relation(fields: [productId], references: [id], onDelete: Restrict)
+  name          String
+  version       Int
+  status        String       @default("DRAFT")
+  modelKey      String       @unique
+  sourceKey     String?
+  modelSize     Int
+  sourceSize    Int?
+  triangleCount Int?
+  textureCount  Int          @default(0)
+  format        String       @default("GLB")
+  model3d       ProductModel3D?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@unique([productId, version])
+  @@index([productId, status])
+}
+
+// -------------------------------------------------------------
+// INVENTORY & STOCK
+// -------------------------------------------------------------
+model Inventory {
+  id                String          @id @default(uuid())
+  productId         String          @unique
+  product           Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId         String?         @unique
+  variant           ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  available         Int             @default(50)
+  reserved          Int             @default(0)
+  sold              Int             @default(0)
+  lowStockThreshold Int             @default(10)
+  updatedAt         DateTime        @updatedAt
+}
+
+// -------------------------------------------------------------
+// CART & WISHLIST
+// -------------------------------------------------------------
+model Cart {
+  id        String     @id @default(uuid())
+  userId    String     @unique
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     CartItem[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model CartItem {
+  id        String          @id @default(uuid())
+  cartId    String
+  cart      Cart            @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  quantity  Int             @default(1)
+  unitPrice Float
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+}
+
+model Wishlist {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
+}
+
+// -------------------------------------------------------------
+// ADDRESSES, ORDERS & PAYMENTS
+// -------------------------------------------------------------
+model Address {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName     String
+  phone        String
+  street       String
+  apartment    String?
+  city         String
+  state        String
+  postalCode   String
+  country      String   @default("United States")
+  isDefault    Boolean  @default(false)
+  type         String   @default("HOME") // HOME | OFFICE | OTHER
+  orders       Order[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Order {
+  id             String      @id @default(uuid())
+  orderNumber    String      @unique
+  userId         String
+  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  addressId      String?
+  shippingAddress Address?   @relation(fields: [addressId], references: [id], onDelete: SetNull)
+  
+  // Status flow:
+  // ORDER_PLACED -> PAYMENT_CONFIRMED -> PROCESSING -> PACKED -> READY_FOR_PICKUP -> PICKED_UP -> OUT_FOR_DELIVERY -> DELIVERED (or CANCELLED / FAILED)
+  status         String      @default("ORDER_PLACED")
+  
+  // Payment
+  paymentStatus  String      @default("PENDING") // PENDING | PAID | FAILED | REFUNDED
+  paymentMethod  String      @default("ONLINE")  // ONLINE | COD
+  
+  subtotal       Float
+  discount       Float       @default(0.0)
+  tax            Float       @default(0.0)
+  shippingFee    Float       @default(0.0)
+  total          Float
+  
+  couponCode     String?
+  notes          String?
+  deliveryOtp    String      // Server-generated 6-digit OTP for secure handover
+  
+  items          OrderItem[]
+  payments       Payment[]
+  delivery       Delivery?
+  
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+}
+
+model OrderItem {
+  id          String          @id @default(uuid())
+  orderId     String
+  order       Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product         @relation(fields: [productId], references: [id], onDelete: Restrict)
+  variantId   String?
+  variant     ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  productName String
+  variantName String?
+  colorHex    String?
+  sku         String
+  unitPrice   Float
+  quantity    Int
+  totalPrice  Float
+}
+
+model Payment {
+  id            String   @id @default(uuid())
+  orderId       String
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  transactionId String   @unique
+  provider      String   // STRIPE_SIMULATED, RAZORPAY_SIMULATED, COD_PENDING
+  amount        Float
+  currency      String   @default("USD")
+  status        String   @default("SUCCESS") // PENDING, SUCCESS, FAILED, REFUNDED
+  rawResponse   String?
+  createdAt     DateTime @default(now())
+}
+
+// -------------------------------------------------------------
+// DELIVERY SYSTEM
+// -------------------------------------------------------------
+model Delivery {
+  id              String           @id @default(uuid())
+  orderId         String           @unique
+  order           Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  partnerId       String?
+  partner         DeliveryPartner? @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+  
+  // Status: ASSIGNED -> ACCEPTED -> PICKED_UP -> OUT_FOR_DELIVERY -> DELIVERED (or FAILED)
+  status          String           @default("UNASSIGNED")
+  
+  assignedAt      DateTime?
+  acceptedAt      DateTime?
+  pickedUpAt      DateTime?
+  outForDeliveryAt DateTime?
+  deliveredAt     DateTime?
+  failedAt        DateTime?
+  failedReason    String?
+  
+  customerOtp     String           // Synced with Order.deliveryOtp
+  otpVerified     Boolean          @default(false)
+  otpVerifiedAt   DateTime?
+  
+  proofImageUrl   String?
+  recipientName   String?
+  partnerNotes    String?
+  
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+}
+
+// -------------------------------------------------------------
+// MARKETING & REVIEWS
+// -------------------------------------------------------------
+model Coupon {
+  id             String    @id @default(uuid())
+  code           String    @unique
+  description    String?
+  discountType   String    @default("PERCENT") // PERCENT | FIXED
+  discountValue  Float
+  minOrderValue  Float     @default(0.0)
+  maxDiscount    Float?
+  validFrom      DateTime  @default(now())
+  validUntil     DateTime?
+  usageLimit     Int?
+  usageCount     Int       @default(0)
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+}
+
+model Review {
+  id                 String   @id @default(uuid())
+  productId          String
+  product            Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId             String
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rating             Int      @default(5)
+  title              String
+  comment            String
+  isVerifiedPurchase Boolean  @default(true)
+  createdAt          DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      String   @default("INFO") // ORDER | DELIVERY | SYSTEM | PROMO
+  link      String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String?
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action     String   // ORDER_CREATED, DELIVERY_ASSIGNED, OTP_VERIFIED, INVENTORY_UPDATED, etc.
+  entityType String   // Order, Product, Delivery, User
+  entityId   String?
+  details    String?  // JSON formatted details
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+}
+
+model SiteSettings {
+  id             String   @id @default("primary")
+  siteName       String   @default("EYECAP")
+  defaultTitle   String   @default("EYECAP — Premium Eyewear")
+  titleTemplate  String   @default("%page% | EYECAP")
+  description    String   @default("Architectural eyewear engineered with precision optics.")
+  logoUrl        String?
+  faviconUrl     String?
+  primaryColor   String   @default("#22d3ee")
+  accentColor    String   @default("#d4af37")
+  backgroundColor String @default("#08090c")
+  socialLinks    String   @default("{}")
+  updatedAt      DateTime @updatedAt
+}
+
+model HomepageSection {
+  id           String   @id @default(uuid())
+  key          String   @unique
+  title        String
+  subtitle     String?
+  body         String?
+  imageUrl     String?
+  ctaText      String?
+  ctaUrl       String?
+  background   String?
+  animation    String   @default("none")
+  isEnabled    Boolean  @default(true)
+  displayOrder Int      @default(0)
+  updatedAt    DateTime @updatedAt
+}
+
+model Post {
+  id          String   @id @default(uuid())
+  slug        String   @unique
+  title       String
+  subtitle    String?
+  description String
+  coverImage  String?
+  gallery     String   @default("[]")
+  type        String   @default("ANNOUNCEMENT")
+  status      String   @default("DRAFT")
+  animation   String   @default("none")
+  isFeatured  Boolean  @default(false)
+  priority    Int      @default(0)
+  publishedAt DateTime?
+  startsAt    DateTime?
+  endsAt      DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Popup {
+  id              String   @id @default(uuid())
+  title           String
+  description     String?
+  imageUrl        String?
+  ctaText         String?
+  destinationUrl  String?
+  displayFrequency String @default("once")
+  deviceTarget    String   @default("all")
+  status          String   @default("DRAFT")
+  startsAt        DateTime?
+  endsAt          DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model GraphicsConfig {
+  id            String   @id @default("primary")
+  draftJson     String   @default("{}")
+  publishedJson String   @default("{}")
+  version       Int      @default(1)
+  updatedAt     DateTime @updatedAt
+  revisions     GraphicsRevision[]
+}
+
+model GraphicsRevision {
+  id        String         @id @default(uuid())
+  configId  String
+  config    GraphicsConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+  version   Int
+  configJson String
+  createdAt DateTime       @default(now())
+
+  @@unique([configId, version])
+  @@index([configId, createdAt])
+}

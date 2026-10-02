@@ -184,6 +184,23 @@ export default function OrderTrackingPage() {
         </div>
       </div>
 
+      {/* DELIVERY TRACKING ID */}
+      <div className="rounded-2xl border border-eyecap-border bg-eyecap-surface p-6">
+        <h3 className="text-xs font-mono uppercase tracking-wider text-eyecap-cyan">
+          Delivery Tracking ID
+        </h3>
+        {order.delivery?.trackingNumber ? (
+          <p className="mt-3 break-all font-mono text-sm font-semibold text-white">
+            {order.delivery.trackingNumber}
+          </p>
+        ) : (
+          <p className="mt-3 text-sm text-eyecap-muted">
+            The tracking ID will appear here once a courier tracking number is
+            assigned to this order.
+          </p>
+        )}
+      </div>
+
       {/* ASSIGNED COURIER & DESTINATION */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Courier Info */}

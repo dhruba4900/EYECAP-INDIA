@@ -110,7 +110,7 @@ const navLinks = [
   },
   {
     label: "SUPPORT & CARE",
-    href: "/support",
+    href: "/support-and-care",
   },
 ];
 

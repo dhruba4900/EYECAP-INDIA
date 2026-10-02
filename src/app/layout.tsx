@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { CartProvider } from "@/context/CartContext";
@@ -29,7 +30,9 @@ export default function RootLayout({
         <AuthProvider>
           <CartProvider>
             <SiteBranding />
-            <Navbar />
+            <Suspense fallback={null}>
+              <Navbar />
+            </Suspense>
             <main className="flex-1">{children}</main>
             <CartDrawer />
             <Footer />

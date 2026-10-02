@@ -121,14 +121,14 @@ async function main() {
   const customerAddress = await prisma.address.create({
     data: {
       userId: customerUser.id,
-      fullName: "Dhiman Roy",
+      fullName: "Sanklap Roy",
       phone: "+1 (555) 392-8810",
       street: "742 Evergreen Terrace, Suite 4B",
       apartment: "Penthouse Level",
-      city: "San Francisco",
-      state: "CA",
+      city: "Borisal",
+      state: "Dhaka",
       postalCode: "94105",
-      country: "United States",
+      country: "Bangladesh",
       isDefault: true,
       type: "HOME",
     },

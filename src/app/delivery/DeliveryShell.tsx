@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Truck, LogOut } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import BrandLogo from "@/components/layout/BrandLogo";
 
 export default function DeliveryLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -62,9 +63,7 @@ export default function DeliveryLayout({ children }: { children: React.ReactNode
       {/* Mobile-First Header */}
       <header className="sticky top-0 z-30 bg-[#0C1017]/90 backdrop-blur-md border-b border-[#1A2332] px-4 sm:px-6 h-16 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-emerald-500 text-black flex items-center justify-center font-black text-base shadow-md shadow-emerald-500/20">
-            <Truck className="w-4 h-4" />
-          </div>
+          <BrandLogo className="h-10 w-10 object-contain" />
           <div>
             <span className="font-bold text-sm tracking-wider text-white">EYECAP</span>
             <span className="block text-[9px] font-mono text-emerald-400 uppercase -mt-0.5 tracking-wider">

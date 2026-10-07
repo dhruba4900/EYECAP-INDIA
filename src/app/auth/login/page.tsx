@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Lock, Mail, ArrowRight, AlertCircle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import BrandLogo from "@/components/layout/BrandLogo";
 
 function LoginForm() {
   const router = useRouter();
@@ -40,9 +41,7 @@ function LoginForm() {
       <div className="p-8 rounded-3xl bg-eyecap-surface border border-eyecap-border shadow-2xl space-y-6">
         <div className="text-center space-y-1">
           <Link href="/" className="inline-flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-eyecap-cyan to-blue-600 flex items-center justify-center font-black text-black">
-              E
-            </div>
+            <BrandLogo className="h-10 w-10 object-contain" />
             <span className="text-lg font-bold tracking-[0.2em] text-white">EYECAP</span>
           </Link>
           <h1 className="text-xl font-bold text-white">Sign In to EYECAP</h1>

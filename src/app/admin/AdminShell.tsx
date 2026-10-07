@@ -22,6 +22,7 @@ import {
   User,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import BrandLogo from "@/components/layout/BrandLogo";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -105,9 +106,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           {/* Logo Brand */}
           <div className="h-16 border-b border-[#1C202C] flex items-center justify-between px-5">
             <Link href="/admin" className="flex items-center gap-2.5 overflow-hidden">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center font-black text-white shrink-0 shadow-md shadow-purple-500/20">
-                E
-              </div>
+              <BrandLogo className="h-9 w-9 shrink-0 object-contain" />
               {!collapsed && (
                 <div>
                   <span className="font-bold text-sm tracking-[0.2em] text-white">EYECAP</span>

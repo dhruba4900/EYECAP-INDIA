@@ -42,15 +42,13 @@ export default function SiteBranding() {
           detail: { logoUrl: settings.logoUrl, siteName: settings.siteName },
         }));
 
-        if (settings.faviconUrl) {
-          let icon = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
-          if (!icon) {
-            icon = document.createElement("link");
-            icon.rel = "icon";
-            document.head.appendChild(icon);
-          }
-          icon.href = settings.faviconUrl;
+        let icon = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
+        if (!icon) {
+          icon = document.createElement("link");
+          icon.rel = "icon";
+          document.head.appendChild(icon);
         }
+        icon.href = settings.faviconUrl || "/favicon.svg";
       } catch (error) {
         console.error("Site branding load error:", error);
       }

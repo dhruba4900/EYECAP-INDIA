@@ -15,6 +15,7 @@ import {
 
 import { useAuth } from "@/context/AuthContext";
 import { useCart } from "@/context/CartContext";
+import BrandLogo from "@/components/layout/BrandLogo";
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -179,14 +180,10 @@ const navLinks = [
                 <img
                   src={brand.logoUrl}
                   alt={brand.siteName}
-                  className="h-9 w-9 rounded-lg object-contain"
+                  className="h-10 w-10 object-contain transition-transform duration-200 group-hover:scale-105"
                 />
               ) : (
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-tr from-eyecap-cyan to-blue-600 shadow-lg shadow-eyecap-cyan/20 transition-transform duration-200 group-hover:scale-105">
-                  <span className="text-lg font-black tracking-tighter text-black">
-                    E
-                  </span>
-                </div>
+                <BrandLogo className="h-10 w-10 object-contain transition-transform duration-200 group-hover:scale-105" priority />
               )}
 
               <div className="hidden flex-col sm:flex">

@@ -4,8 +4,12 @@ import { requireAuth } from "@/lib/auth";
 
 export async function GET() {
   const auth = await requireAuth(["ADMIN"]);
+
   if ("error" in auth) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
+    return NextResponse.json(
+      { error: auth.error },
+      { status: auth.status }
+    );
   }
 
   try {
@@ -22,82 +26,162 @@ export async function GET() {
       deliveryPartners,
     ] = await Promise.all([
       prisma.order.findMany({
-        select: { total: true, status: true, paymentStatus: true, createdAt: true },
+        select: {
+          total: true,
+          status: true,
+          paymentStatus: true,
+          createdAt: true,
+        },
       }),
+
       prisma.order.findMany({
-        where: { createdAt: { gte: todayStart } },
-        select: { total: true },
+        where: {
+          createdAt: {
+            gte: todayStart,
+          },
+        },
+        select: {
+          total: true,
+          paymentStatus: true,
+        },
       }),
-      prisma.user.count({ where: { role: "CUSTOMER" } }),
-      prisma.product.count({ where: { isPublished: true } }),
+
+      prisma.user.count({
+        where: {
+          role: "CUSTOMER",
+        },
+      }),
+
+      prisma.product.count({
+        where: {
+          isPublished: true,
+        },
+      }),
+
       prisma.inventory.findMany({
         where: {
-          available: { lte: 15 },
+          available: {
+            lte: 15,
+          },
         },
         include: {
           product: {
-            select: { id: true, name: true, sku: true, basePrice: true },
+            select: {
+              id: true,
+              name: true,
+              sku: true,
+              basePrice: true,
+            },
           },
         },
         take: 8,
       }),
+
       prisma.order.findMany({
         take: 6,
-        orderBy: { createdAt: "desc" },
+        orderBy: {
+          createdAt: "desc",
+        },
         include: {
-          user: { select: { firstName: true, lastName: true, email: true } },
+          user: {
+            select: {
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
           delivery: {
             include: {
               partner: {
-                include: { user: { select: { firstName: true, lastName: true } } },
+                include: {
+                  user: {
+                    select: {
+                      firstName: true,
+                      lastName: true,
+                    },
+                  },
+                },
               },
             },
           },
         },
       }),
+
       prisma.deliveryPartner.findMany({
         include: {
-          user: { select: { firstName: true, lastName: true, phone: true } },
-          _count: { select: { deliveries: true } },
+          user: {
+            select: {
+              firstName: true,
+              lastName: true,
+              phone: true,
+            },
+          },
+          _count: {
+            select: {
+              deliveries: true,
+            },
+          },
         },
       }),
     ]);
 
-    // Financial calculations
     const totalRevenue = allOrders
-      .filter((o) => o.paymentStatus === "PAID")
-      .reduce((sum, o) => sum + o.total, 0);
+      .filter((order) => order.paymentStatus === "PAID")
+      .reduce((sum, order) => sum + order.total, 0);
 
-    const todayRevenue = todayOrders.reduce((sum, o) => sum + o.total, 0);
+    const todayRevenue = todayOrders
+      .filter((order) => order.paymentStatus === "PAID")
+      .reduce((sum, order) => sum + order.total, 0);
 
-    const pendingOrdersCount = allOrders.filter(
-      (o) => o.status !== "DELIVERED" && o.status !== "CANCELLED"
+    const pendingOrders = allOrders.filter(
+      (order) =>
+        order.status !== "DELIVERED" &&
+        order.status !== "CANCELLED"
     ).length;
 
-    const deliveredOrdersCount = allOrders.filter((o) => o.status === "DELIVERED").length;
-    const cancelledOrdersCount = allOrders.filter((o) => o.status === "CANCELLED").length;
+    const deliveredOrders = allOrders.filter(
+      (order) => order.status === "DELIVERED"
+    ).length;
 
-    // Generate 7-day sales curve
-    const last7Days: { date: string; sales: number; orders: number }[] = [];
+    const cancelledOrders = allOrders.filter(
+      (order) => order.status === "CANCELLED"
+    ).length;
+
+    const last7Days: {
+      date: string;
+      sales: number;
+      orders: number;
+    }[] = [];
+
     for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const dateStr = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      const date = new Date();
 
-      const dayStart = new Date(d.setHours(0, 0, 0, 0));
-      const dayEnd = new Date(d.setHours(23, 59, 59, 999));
+      date.setDate(date.getDate() - i);
 
-      const matchingOrders = allOrders.filter((o) => {
-        const orderDate = new Date(o.createdAt);
-        return orderDate >= dayStart && orderDate <= dayEnd;
+      const dayStart = new Date(date);
+      dayStart.setHours(0, 0, 0, 0);
+
+      const dayEnd = new Date(date);
+      dayEnd.setHours(23, 59, 59, 999);
+
+      const matchingOrders = allOrders.filter((order) => {
+        const orderDate = new Date(order.createdAt);
+
+        return (
+          orderDate >= dayStart &&
+          orderDate <= dayEnd
+        );
       });
 
       const daySales = matchingOrders
-        .filter((o) => o.paymentStatus === "PAID")
-        .reduce((sum, o) => sum + o.total, 0);
+        .filter((order) => order.paymentStatus === "PAID")
+        .reduce((sum, order) => sum + order.total, 0);
 
       last7Days.push({
-        date: dateStr,
+        date: date.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+        }),
         sales: Math.round(daySales),
         orders: matchingOrders.length,
       });
@@ -105,23 +189,39 @@ export async function GET() {
 
     return NextResponse.json({
       metrics: {
-        totalRevenue: Math.round(totalRevenue * 100) / 100,
-        todayRevenue: Math.round(todayRevenue * 100) / 100,
+        totalRevenue:
+          Math.round(totalRevenue * 100) / 100,
+
+        todayRevenue:
+          Math.round(todayRevenue * 100) / 100,
+
         totalOrders: allOrders.length,
-        pendingOrders: pendingOrdersCount,
-        deliveredOrders: deliveredOrdersCount,
-        cancelledOrders: cancelledOrdersCount,
+        pendingOrders,
+        deliveredOrders,
+        cancelledOrders,
         totalCustomers,
         totalProducts,
         lowStockCount: lowStockProducts.length,
       },
+
       salesChart: last7Days,
+
       lowStockProducts,
+
       recentOrders,
+
       deliveryPartners,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Dashboard error:", error);
-    return NextResponse.json({ error: "Failed to generate dashboard metrics" }, { status: 500 });
+
+    return NextResponse.json(
+      {
+        error: "Failed to generate dashboard metrics",
+      },
+      {
+        status: 500,
+      }
+    );
   }
 }

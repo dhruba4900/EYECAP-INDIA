@@ -12,6 +12,10 @@ export const metadata: Metadata = {
   title: "EYECAP | Haute Optique & Engineering",
   description: "Bespoke Japanese Beta-Titanium Eyewear, Polarized Sun Optics, and High-Performance BlueBlock Digital Glasses.",
   keywords: ["luxury glasses", "titanium eyewear", "blue light glasses", "polarized sunglasses", "smart audio glasses"],
+  icons: {
+    icon: "/favicon.svg",
+    apple: "/eyecap-logo.png",
+  },
   openGraph: {
     title: "EYECAP — Haute Optique & Engineering",
     description: "Architectural eyewear engineered with Japanese Beta-Titanium and precision optics.",

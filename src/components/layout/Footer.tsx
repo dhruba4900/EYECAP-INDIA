@@ -4,6 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { ShieldCheck, Sparkles, Truck, RefreshCw, Award } from "lucide-react";
 import { usePathname } from "next/navigation";
+import BrandLogo from "@/components/layout/BrandLogo";
 
 export default function Footer() {
   const pathname = usePathname();
@@ -58,9 +59,7 @@ export default function Footer() {
       <div className="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-5 gap-10">
         <div className="col-span-2">
           <Link href="/" className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-eyecap-cyan to-blue-600 flex items-center justify-center font-black text-black">
-              E
-            </div>
+            <BrandLogo className="h-12 w-12 object-contain" />
             <span className="text-xl font-bold tracking-[0.2em] text-white">EYECAP</span>
           </Link>
           <p className="text-xs text-eyecap-muted leading-relaxed max-w-sm mb-6">

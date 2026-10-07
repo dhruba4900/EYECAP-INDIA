@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
       },
 
       include: {
-        product: {
+        Product: {
           select: {
             id: true,
             name: true,
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
           },
         },
 
-        variant: {
+        ProductVariant: {
           select: {
             id: true,
             name: true,
@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
           },
         },
 
-        order: {
+        Order: {
           select: {
             id: true,
             orderNumber: true,
@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
           },
         },
 
-        owner: {
+        User: {
           select: {
             firstName: true,
             lastName: true,
@@ -115,9 +115,9 @@ export async function GET(request: NextRequest) {
      * from this public endpoint.
      */
 
-    const ownerName = productUnit.owner
-      ? `${productUnit.owner.firstName?.charAt(0) || ""}****** ${
-          productUnit.owner.lastName?.charAt(0) || ""
+    const ownerName = productUnit.User
+      ? `${productUnit.User.firstName?.charAt(0) || ""}****** ${
+          productUnit.User.lastName?.charAt(0) || ""
         }********`
       : null;
 
@@ -136,33 +136,33 @@ export async function GET(request: NextRequest) {
         warrantyUntil: productUnit.warrantyUntil,
 
         model: {
-          name: productUnit.product.name,
-          modelNumber: productUnit.product.sku,
-          slug: productUnit.product.slug,
-          headline: productUnit.product.headline,
-          description: productUnit.product.description,
+          name: productUnit.Product.name,
+          modelNumber: productUnit.Product.sku,
+          slug: productUnit.Product.slug,
+          headline: productUnit.Product.headline,
+          description: productUnit.Product.description,
 
-          releaseDate: productUnit.product.releaseDate,
+          releaseDate: productUnit.Product.releaseDate,
 
           specifications: {
-            frameShape: productUnit.product.frameShape,
-            frameMaterial: productUnit.product.frameMaterial,
-            lensMaterial: productUnit.product.lensMaterial,
-            lensWidthMm: productUnit.product.lensWidthMm,
-            bridgeWidthMm: productUnit.product.bridgeWidthMm,
-            templeLengthMm: productUnit.product.templeLengthMm,
-            totalWeightG: productUnit.product.totalWeightG,
-            genderStyle: productUnit.product.genderStyle,
+            frameShape: productUnit.Product.frameShape,
+            frameMaterial: productUnit.Product.frameMaterial,
+            lensMaterial: productUnit.Product.lensMaterial,
+            lensWidthMm: productUnit.Product.lensWidthMm,
+            bridgeWidthMm: productUnit.Product.bridgeWidthMm,
+            templeLengthMm: productUnit.Product.templeLengthMm,
+            totalWeightG: productUnit.Product.totalWeightG,
+            genderStyle: productUnit.Product.genderStyle,
           },
         },
 
-        variant: productUnit.variant
+        variant: productUnit.ProductVariant
           ? {
-              name: productUnit.variant.name,
-              colorName: productUnit.variant.colorName,
-              colorHex: productUnit.variant.colorHex,
-              size: productUnit.variant.size,
-              sku: productUnit.variant.sku,
+              name: productUnit.ProductVariant.name,
+              colorName: productUnit.ProductVariant.colorName,
+              colorHex: productUnit.ProductVariant.colorHex,
+              size: productUnit.ProductVariant.size,
+              sku: productUnit.ProductVariant.sku,
             }
           : null,
 
@@ -172,24 +172,24 @@ export async function GET(request: NextRequest) {
             }
           : null,
 
-        order: productUnit.order
+        order: productUnit.Order
           ? {
-              orderNumber: productUnit.order.orderNumber,
-              status: productUnit.order.status,
-              paymentStatus: productUnit.order.paymentStatus,
+              orderNumber: productUnit.Order.orderNumber,
+              status: productUnit.Order.status,
+              paymentStatus: productUnit.Order.paymentStatus,
               purchasedAt: productUnit.purchasedAt,
-              createdAt: productUnit.order.createdAt,
+              createdAt: productUnit.Order.createdAt,
 
-              delivery: productUnit.order.delivery
+              delivery: productUnit.Order.delivery
                 ? {
                     trackingNumber:
-                      productUnit.order.delivery.trackingNumber,
-                    status: productUnit.order.delivery.status,
-                    acceptedAt: productUnit.order.delivery.acceptedAt,
-                    pickedUpAt: productUnit.order.delivery.pickedUpAt,
+                      productUnit.Order.delivery.trackingNumber,
+                    status: productUnit.Order.delivery.status,
+                    acceptedAt: productUnit.Order.delivery.acceptedAt,
+                    pickedUpAt: productUnit.Order.delivery.pickedUpAt,
                     outForDeliveryAt:
-                      productUnit.order.delivery.outForDeliveryAt,
-                    deliveredAt: productUnit.order.delivery.deliveredAt,
+                      productUnit.Order.delivery.outForDeliveryAt,
+                    deliveredAt: productUnit.Order.delivery.deliveredAt,
                   }
                 : null,
             }

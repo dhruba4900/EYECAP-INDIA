@@ -128,6 +128,7 @@ export async function POST(request: NextRequest) {
 
     const ticket = await prisma.supportTicket.create({
       data: {
+        id: crypto.randomUUID(),
         ticketNumber,
         userId: user.id,
         orderId: order?.id ?? null,
@@ -135,6 +136,7 @@ export async function POST(request: NextRequest) {
         subject: subject.trim(),
         description: details,
         status: "OPEN",
+        updatedAt: new Date(),
       },
       select: {
         id: true,
@@ -145,6 +147,7 @@ export async function POST(request: NextRequest) {
 
     await prisma.supportStatusHistory.create({
       data: {
+        id: crypto.randomUUID(),
         ticketId: ticket.id,
         toStatus: "OPEN",
         note: "Ticket created by customer from the Support & Care page.",
@@ -166,6 +169,7 @@ export async function POST(request: NextRequest) {
 
       await prisma.supportAttachment.create({
         data: {
+          id: crypto.randomUUID(),
           ticketId: ticket.id,
           fileUrl: key,
           fileName: file.name,

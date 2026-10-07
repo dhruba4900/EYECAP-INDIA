@@ -19,7 +19,7 @@ import {
   ArrowRight,
   Share2,
 } from "lucide-react";
-import EyewearViewer from "@/components/3d/EyewearViewer";
+import EyewearViewer from "@/components/3d/ProductEyewearViewer";
 import ProductCard from "@/components/shop/ProductCard";
 import { formatCurrency } from "@/lib/utils";
 import { useCart } from "@/context/CartContext";

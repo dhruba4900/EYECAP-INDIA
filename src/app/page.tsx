@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import ProductCard from "@/components/shop/ProductCard";
 import { formatCurrency } from "@/lib/utils";
+import type { Product } from "@/types/product";
 
 type HeroMediaType = "image" | "video";
 
@@ -89,10 +90,6 @@ type HomepageContent = {
   graphics?: unknown;
 };
 
-type Product = {
-  id: string;
-  [key: string]: unknown;
-};
 
 const FALLBACK_HERO_SLIDES: HeroSlide[] = [
   {

@@ -2,171 +2,262 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { Sparkles, Eye, Star, ShoppingBag, Check } from "lucide-react";
+import { Eye, Star, ShoppingBag, Check } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { useCart } from "@/context/CartContext";
+import type { Product } from "@/types/product";
 
 interface ProductCardProps {
-  product: {
-    id: string;
-    name: string;
-    slug: string;
-    headline?: string | null;
-    basePrice: number;
-    comparePrice?: number | null;
-    frameShape: string;
-    frameMaterial: string;
-    rating: number;
-    reviewCount: number;
-    isFeatured?: boolean;
-    isNew?: boolean;
-    images: { url: string; alt?: string | null }[];
-    variants?: { id: string; name: string; colorHex: string; colorName: string }[];
-    model3d?: any;
-    inventory?: { available: number; lowStockThreshold: number } | null;
-  };
+  product: Product;
 }
 
 export default function ProductCard({ product }: ProductCardProps) {
   const { addToCart } = useCart();
-  const [selectedVariant, setSelectedVariant] = useState(
-    product.variants && product.variants.length > 0 ? product.variants[0] : null
+
+  const [selectedVariant, setSelectedVariant] = useState<Product["variants"] extends infer T ? T extends Array<infer V> ? V | null : null : null>(
+    product.variants && product.variants.length > 0
+      ? product.variants[0]
+      : null
   );
+
   const [added, setAdded] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const primaryImage = product.images[0]?.url || "https://images.unsplash.com/photo-1572635196237-14b3f281503f?auto=format&fit=crop&w=800&q=80";
+  const primaryImage =
+    product.images[0]?.url ||
+    "https://images.unsplash.com/photo-1572635196237-14b3f281503f?auto=format&fit=crop&w=800&q=80";
+
   const hoverImage = product.images[1]?.url || primaryImage;
 
-  const handleQuickAdd = async (e: React.MouseEvent) => {
+  const handleQuickAdd = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
+
+    if (loading) return;
+
     setLoading(true);
-    const res = await addToCart(product.id, selectedVariant?.id, 1);
-    setLoading(false);
-    if (res.success) {
-      setAdded(true);
-      setTimeout(() => setAdded(false), 2000);
+
+    try {
+      const res = await addToCart(
+        product.id,
+        selectedVariant?.id,
+        1
+      );
+
+      if (res.success) {
+        setAdded(true);
+
+        window.setTimeout(() => {
+          setAdded(false);
+        }, 2000);
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
-  const isLowStock = product.inventory && product.inventory.available <= product.inventory.lowStockThreshold;
+  const isLowStock =
+    product.inventory &&
+    product.inventory.available <= product.inventory.lowStockThreshold;
 
   return (
-    <div className="group relative rounded-2xl bg-eyecap-card/50 border border-eyecap-border/60 hover:border-eyecap-border transition-all duration-300 hover:shadow-2xl hover:shadow-eyecap-cyan/5 flex flex-col justify-between overflow-hidden">
-      {/* Product Image Frame */}
-      <Link href={`/products/${product.slug}`} className="block relative aspect-[4/3] bg-eyecap-dark/80 overflow-hidden">
+    <div className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-eyecap-border/60 bg-eyecap-card/50 transition-all duration-300 hover:border-eyecap-border hover:shadow-2xl hover:shadow-eyecap-cyan/5">
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Product Image                                                      */}
+      {/* ------------------------------------------------------------------ */}
+
+      <Link
+        href={`/products/${product.slug}`}
+        className="relative block aspect-[4/3] overflow-hidden bg-eyecap-dark/80"
+      >
         {/* Badges */}
-        <div className="absolute top-3 left-3 z-10 flex flex-col gap-1.5 items-start">
+        <div className="absolute left-3 top-3 z-10 flex flex-col items-start gap-1.5">
+
           {product.isNew && (
-            <span className="text-[10px] font-mono uppercase tracking-widest px-2 py-0.5 rounded-full bg-eyecap-cyan text-black font-bold">
+            <span className="rounded-full bg-eyecap-cyan px-2 py-0.5 text-[10px] font-mono font-bold uppercase tracking-widest text-black">
               NEW RELEASE
             </span>
           )}
+
           {product.isFeatured && !product.isNew && (
-            <span className="text-[10px] font-mono uppercase tracking-widest px-2 py-0.5 rounded-full bg-eyecap-gold/20 text-eyecap-gold border border-eyecap-gold/30 font-semibold">
+            <span className="rounded-full border border-eyecap-gold/30 bg-eyecap-gold/20 px-2 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-widest text-eyecap-gold">
               FLAGSHIP
             </span>
           )}
+
           {isLowStock && (
-            <span className="text-[10px] font-mono uppercase tracking-widest px-2 py-0.5 rounded-full bg-rose-950/80 text-rose-300 border border-rose-800/40">
+            <span className="rounded-full border border-rose-800/40 bg-rose-950/80 px-2 py-0.5 text-[10px] font-mono uppercase tracking-widest text-rose-300">
               ONLY {product.inventory?.available} LEFT
             </span>
           )}
         </div>
 
-        {/* 3D Available Badge */}
+        {/* 3D Badge */}
         {product.model3d && (
-          <div className="absolute top-3 right-3 z-10 flex items-center gap-1 text-[10px] font-mono text-eyecap-cyan bg-eyecap-surface/80 backdrop-blur-md border border-eyecap-border px-2 py-1 rounded-full">
-            <Eye className="w-3 h-3" />
+          <div className="absolute right-3 top-3 z-10 flex items-center gap-1 rounded-full border border-eyecap-border bg-eyecap-surface/80 px-2 py-1 text-[10px] font-mono text-eyecap-cyan backdrop-blur-md">
+            <Eye className="h-3 w-3" />
             <span>3D VIEW</span>
           </div>
         )}
 
-        {/* Image with smooth crossfade hover */}
+        {/* Primary Image */}
         <img
           src={primaryImage}
-          alt={product.name}
-          className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500 ease-out"
+          alt={product.images[0]?.alt || product.name}
+          className="h-full w-full object-cover object-center transition-transform duration-500 ease-out group-hover:scale-105"
         />
+
+        {/* Hover Image */}
+        {hoverImage !== primaryImage && (
+          <img
+            src={hoverImage}
+            alt={product.images[1]?.alt || product.name}
+            className="absolute inset-0 h-full w-full object-cover object-center opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+          />
+        )}
       </Link>
 
-      {/* Product Details */}
-      <div className="p-5 flex-1 flex flex-col justify-between">
+      {/* ------------------------------------------------------------------ */}
+      {/* Product Details                                                     */}
+      {/* ------------------------------------------------------------------ */}
+
+      <div className="flex flex-1 flex-col justify-between p-5">
+
         <div>
-          {/* Metadata & Material */}
-          <div className="flex items-center justify-between text-[11px] font-mono text-eyecap-muted uppercase mb-1.5">
+
+          {/* Metadata */}
+          <div className="mb-1.5 flex items-center justify-between text-[11px] font-mono uppercase text-eyecap-muted">
             <span>{product.frameShape}</span>
-            <span className="truncate max-w-[140px]">{product.frameMaterial}</span>
+
+            <span className="max-w-[140px] truncate">
+              {product.frameMaterial}
+            </span>
           </div>
 
           {/* Product Name */}
-          <Link href={`/products/${product.slug}`} className="block">
-            <h3 className="text-base font-semibold text-white group-hover:text-eyecap-cyan transition-colors truncate">
+          <Link
+            href={`/products/${product.slug}`}
+            className="block"
+          >
+            <h3 className="truncate text-base font-semibold text-white transition-colors group-hover:text-eyecap-cyan">
               {product.name}
             </h3>
           </Link>
 
+          {/* Headline */}
+          {product.headline && (
+            <p className="mt-1 line-clamp-1 text-xs text-eyecap-muted">
+              {product.headline}
+            </p>
+          )}
+
           {/* Rating */}
-          <div className="flex items-center gap-1.5 mt-1.5 text-xs text-eyecap-silver">
+          <div className="mt-1.5 flex items-center gap-1.5 text-xs text-eyecap-silver">
             <div className="flex items-center text-amber-400">
-              <Star className="w-3.5 h-3.5 fill-current" />
+              <Star className="h-3.5 w-3.5 fill-current" />
             </div>
-            <span className="font-semibold text-white text-xs">{product.rating.toFixed(1)}</span>
-            <span className="text-eyecap-muted text-[11px]">({product.reviewCount})</span>
+
+            <span className="text-xs font-semibold text-white">
+              {product.rating.toFixed(1)}
+            </span>
+
+            <span className="text-[11px] text-eyecap-muted">
+              ({product.reviewCount})
+            </span>
           </div>
 
           {/* Color Swatches */}
           {product.variants && product.variants.length > 1 && (
-            <div className="flex items-center gap-1.5 mt-3">
-              {product.variants.map((v) => (
+            <div className="mt-3 flex items-center gap-1.5">
+
+              {product.variants.map((variant) => (
                 <button
-                  key={v.id}
-                  onClick={() => setSelectedVariant(v)}
-                  title={v.colorName}
-                  className={`w-3.5 h-3.5 rounded-full border transition-all ${
-                    selectedVariant?.id === v.id
-                      ? "ring-2 ring-eyecap-cyan ring-offset-2 ring-offset-eyecap-surface scale-110"
+                  key={variant.id}
+                  type="button"
+                  onClick={() => setSelectedVariant(variant)}
+                  title={variant.colorName}
+                  aria-label={`Select ${variant.colorName}`}
+                  className={`h-3.5 w-3.5 rounded-full border transition-all ${
+                    selectedVariant?.id === variant.id
+                      ? "scale-110 ring-2 ring-eyecap-cyan ring-offset-2 ring-offset-eyecap-surface"
                       : "border-white/20 hover:scale-105"
                   }`}
-                  style={{ backgroundColor: v.colorHex }}
+                  style={{
+                    backgroundColor: variant.colorHex,
+                  }}
                 />
               ))}
-              <span className="text-[10px] text-eyecap-muted ml-1">
+
+              <span className="ml-1 text-[10px] text-eyecap-muted">
                 {selectedVariant?.colorName}
               </span>
             </div>
           )}
         </div>
 
-        {/* Pricing and Action */}
-        <div className="mt-5 pt-3 border-t border-eyecap-border/50 flex items-center justify-between">
+        {/* ---------------------------------------------------------------- */}
+        {/* Pricing + Quick Add                                               */}
+        {/* ---------------------------------------------------------------- */}
+
+        <div className="mt-5 flex items-center justify-between border-t border-eyecap-border/50 pt-3">
+
           <div className="flex flex-col">
+
             <div className="flex items-baseline gap-2">
+
               <span className="text-lg font-bold font-mono text-white">
                 {formatCurrency(product.basePrice)}
               </span>
-              {product.comparePrice && (
-                <span className="text-xs line-through text-eyecap-muted font-mono">
-                  {formatCurrency(product.comparePrice)}
-                </span>
-              )}
+
+              {product.comparePrice !== null &&
+                product.comparePrice !== undefined &&
+                product.comparePrice > product.basePrice && (
+                  <span className="text-xs font-mono text-eyecap-muted line-through">
+                    {formatCurrency(product.comparePrice)}
+                  </span>
+                )}
             </div>
-            <span className="text-[10px] text-emerald-400 font-mono">In Stock & Verified</span>
+
+            <span className="text-[10px] font-mono text-emerald-400">
+              In Stock & Verified
+            </span>
           </div>
 
-          {/* Quick Add Button */}
+          {/* Quick Add */}
           <button
+            type="button"
             onClick={handleQuickAdd}
             disabled={loading}
-            className={`p-2.5 rounded-xl border transition-all flex items-center justify-center ${
+            className={`flex items-center justify-center rounded-xl border p-2.5 transition-all ${
               added
-                ? "bg-emerald-500 text-black border-emerald-400"
-                : "bg-eyecap-surface border-eyecap-border text-white hover:bg-white hover:text-black hover:border-white"
+                ? "border-emerald-400 bg-emerald-500 text-black"
+                : "border-eyecap-border bg-eyecap-surface text-white hover:border-white hover:bg-white hover:text-black"
+            } ${
+              loading
+                ? "cursor-wait opacity-60"
+                : ""
             }`}
-            title="Quick add to bag"
+            title={
+              loading
+                ? "Adding to bag..."
+                : added
+                  ? "Added to bag"
+                  : "Quick add to bag"
+            }
+            aria-label={
+              loading
+                ? "Adding to bag"
+                : added
+                  ? "Added to bag"
+                  : "Quick add to bag"
+            }
           >
-            {added ? <Check className="w-4 h-4" /> : <ShoppingBag className="w-4 h-4" />}
+            {added ? (
+              <Check className="h-4 w-4" />
+            ) : (
+              <ShoppingBag className="h-4 w-4" />
+            )}
           </button>
         </div>
       </div>

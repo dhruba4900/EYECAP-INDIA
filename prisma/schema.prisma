@@ -75,66 +75,84 @@ model DeliveryPartner {
 }
 
 model Category {
-  id           String    @id @default(uuid())
-  name         String    @unique
-  slug         String    @unique
-  description  String?
-  bannerImage  String?
-  displayOrder Int       @default(0)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  products     Product[]
+  id                String            @id @default(uuid())
+  name              String            @unique
+  slug              String            @unique
+  description       String?
+  bannerImage       String?
+  displayOrder      Int               @default(0)
+  isActive          Boolean           @default(true)
+  showInNavigation  Boolean           @default(true)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  products          Product[]
+  productCategories ProductCategory[]
 }
 
 model Product {
-  id              String              @id @default(uuid())
-  name            String
-  slug            String              @unique
-  headline        String?
-  description     String
-  basePrice       Float
-  comparePrice    Float?
-  sku             String              @unique
-  modelNumber     String              @unique
-  brand           String?
-  discountPercent Float               @default(0)
-  gsm             Int?
-  specifications  String              @default("{}")
-  tags            String              @default("[]")
-  seoTitle        String?
-  seoDescription  String?
-  publishedAt     DateTime?
-  categoryId      String
-  isFeatured      Boolean             @default(false)
-  isNew           Boolean             @default(false)
-  isPublished     Boolean             @default(true)
-  frameShape      String              @default("Geometric")
-  frameMaterial   String              @default("Grade 5 Titanium")
-  lensMaterial    String              @default("Polycarbonate UV400 Polarized")
-  lensWidthMm     Int                 @default(53)
-  bridgeWidthMm   Int                 @default(18)
-  templeLengthMm  Int                 @default(145)
-  totalWeightG    Int                 @default(18)
-  genderStyle     String              @default("Unisex")
-  rating          Float               @default(4.8)
-  reviewCount     Int                 @default(0)
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
-  releaseDate     DateTime?
-  cartItems       CartItem[]
-  inventory       Inventory?
-  orderItems      OrderItem[]
-  category        Category            @relation(fields: [categoryId], references: [id])
-  images          ProductImage[]
-  model3d         ProductModel3D?
-  modelAssets     ProductModelAsset[]
-  productVideos   ProductVideo[]
-  glassLinks      ProductGlass[]
-  couponProducts  CouponProduct[]
-  ProductUnit     ProductUnit[]
-  variants        ProductVariant[]
-  reviews         Review[]
-  wishlistItems   Wishlist[]
+  id                String              @id @default(uuid())
+  name              String
+  slug              String              @unique
+  headline          String?
+  description       String
+  basePrice         Float
+  comparePrice      Float?
+  sku               String              @unique
+  modelNumber       String              @unique
+  brand             String?
+  discountPercent   Float               @default(0)
+  gsm               Int?
+  specifications    String              @default("{}")
+  tags              String              @default("[]")
+  seoTitle          String?
+  seoDescription    String?
+  publishedAt       DateTime?
+  categoryId        String?
+  isFeatured        Boolean             @default(false)
+  isNew             Boolean             @default(false)
+  isPublished       Boolean             @default(true)
+  frameShape        String              @default("Geometric")
+  frameMaterial     String              @default("Grade 5 Titanium")
+  lensMaterial      String              @default("Polycarbonate UV400 Polarized")
+  lensWidthMm       Int                 @default(53)
+  bridgeWidthMm     Int                 @default(18)
+  templeLengthMm    Int                 @default(145)
+  totalWeightG      Int                 @default(18)
+  genderStyle       String              @default("Unisex")
+  rating            Float               @default(4.8)
+  reviewCount       Int                 @default(0)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  releaseDate       DateTime?
+  cartItems         CartItem[]
+  inventory         Inventory?
+  orderItems        OrderItem[]
+  category          Category?           @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  productCategories ProductCategory[]
+  images            ProductImage[]
+  model3d           ProductModel3D?
+  modelAssets       ProductModelAsset[]
+  productVideos     ProductVideo[]
+  glassLinks        ProductGlass[]
+  couponProducts    CouponProduct[]
+  ProductUnit       ProductUnit[]
+  variants          ProductVariant[]
+  reviews           Review[]
+  wishlistItems     Wishlist[]
+}
+
+model ProductCategory {
+  id         String   @id @default(uuid())
+  productId  String
+  categoryId String
+  createdAt  DateTime @default(now())
+
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, categoryId])
+  @@index([productId])
+  @@index([categoryId])
 }
 
 model ProductVariant {

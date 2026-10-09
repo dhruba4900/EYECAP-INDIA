@@ -1,8 +1,14 @@
+// src/app/api/admin/products/route.ts
+
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 
-function slugify(value: string) {
+/* =========================================================
+   HELPERS
+========================================================= */
+
+function slugify(value: string): string {
   return value
     .toLowerCase()
     .trim()
@@ -13,18 +19,20 @@ function slugify(value: string) {
 
 function parseJsonObject(value: unknown): Record<string, unknown> {
   if (typeof value !== "string") {
-    return value && typeof value === "object" && !Array.isArray(value)
+    return value &&
+      typeof value === "object" &&
+      !Array.isArray(value)
       ? (value as Record<string, unknown>)
       : {};
   }
 
   try {
-    const parsed = JSON.parse(value);
+    const parsed: unknown = JSON.parse(value);
 
     return parsed &&
       typeof parsed === "object" &&
       !Array.isArray(parsed)
-      ? parsed
+      ? (parsed as Record<string, unknown>)
       : {};
   } catch {
     return {};
@@ -33,32 +41,44 @@ function parseJsonObject(value: unknown): Record<string, unknown> {
 
 function parseStringArray(value: unknown): string[] {
   if (Array.isArray(value)) {
-    return value
-      .map((item) => String(item).trim())
-      .filter(Boolean);
+    return Array.from(
+      new Set(
+        value
+          .map((item) => String(item).trim())
+          .filter(Boolean)
+      )
+    );
   }
 
   if (typeof value === "string") {
     try {
-      const parsed = JSON.parse(value);
+      const parsed: unknown = JSON.parse(value);
 
       if (Array.isArray(parsed)) {
-        return parsed
-          .map((item) => String(item).trim())
-          .filter(Boolean);
+        return Array.from(
+          new Set(
+            parsed
+              .map((item) => String(item).trim())
+              .filter(Boolean)
+          )
+        );
       }
     } catch {
-      return value
-        .split(",")
-        .map((item) => item.trim())
-        .filter(Boolean);
+      return Array.from(
+        new Set(
+          value
+            .split(",")
+            .map((item) => item.trim())
+            .filter(Boolean)
+        )
+      );
     }
   }
 
   return [];
 }
 
-function asDate(value: unknown) {
+function asDate(value: unknown): Date | null {
   if (!value) return null;
 
   const date = new Date(String(value));
@@ -85,21 +105,42 @@ function asNonNegativeNumber(
 function calculateDiscountedPrice(
   price: number,
   discountPercent: number
-) {
+): number {
   const safeDiscount = Math.min(
     100,
     Math.max(0, discountPercent)
   );
 
-  return Math.round(
-    (price * (1 - safeDiscount / 100) + Number.EPSILON) * 100
-  ) / 100;
+  return (
+    Math.round(
+      (price * (1 - safeDiscount / 100) + Number.EPSILON) *
+        100
+    ) / 100
+  );
 }
 
-/**
- * GET
- * Admin product catalogue
- */
+function getUniqueIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+
+  return Array.from(
+    new Set(
+      value
+        .map((item) => String(item).trim())
+        .filter(Boolean)
+    )
+  );
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error
+    ? error.message
+    : "An unexpected error occurred.";
+}
+
+/* =========================================================
+   GET — ADMIN PRODUCT CATALOGUE
+========================================================= */
+
 export async function GET(request: Request) {
   const auth = await requireAuth(["ADMIN"]);
 
@@ -112,8 +153,7 @@ export async function GET(request: Request) {
 
   try {
     const url = new URL(request.url);
-    const search =
-      url.searchParams.get("search")?.trim() || "";
+    const search = url.searchParams.get("search")?.trim() || "";
 
     const products = await prisma.product.findMany({
       where: search
@@ -146,10 +186,30 @@ export async function GET(request: Request) {
       },
 
       include: {
+        // Legacy single-category relation is retained.
         category: {
           select: {
             id: true,
             name: true,
+            slug: true,
+          },
+        },
+
+        // New multiple-category relation.
+        productCategories: {
+          include: {
+            category: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+                isActive: true,
+                showInNavigation: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: "asc",
           },
         },
 
@@ -202,27 +262,32 @@ export async function GET(request: Request) {
       },
     });
 
-    /**
-     * Keep the database price numeric.
-     *
-     * Currency formatting such as ₹ should be handled
-     * by the UI. This keeps calculations safe.
-     */
     const formattedProducts = products.map((product) => {
       const originalPrice = Number(product.basePrice);
+
       const discountPercent = Math.min(
         100,
         Math.max(0, Number(product.discountPercent || 0))
       );
 
-      const discountedPrice =
-        calculateDiscountedPrice(
-          originalPrice,
-          discountPercent
-        );
+      const discountedPrice = calculateDiscountedPrice(
+        originalPrice,
+        discountPercent
+      );
+
+      // Provide a simple categoryIds array for the admin UI.
+      const categoryIds = Array.from(
+        new Set([
+          ...(product.categoryId ? [product.categoryId] : []),
+          ...product.productCategories.map(
+            (relation) => relation.categoryId
+          ),
+        ])
+      );
 
       return {
         ...product,
+        categoryIds,
         pricing: {
           currency: "INR",
           currencySymbol: "₹",
@@ -233,23 +298,27 @@ export async function GET(request: Request) {
       };
     });
 
-    return NextResponse.json({
-      products: formattedProducts,
-      currency: {
-        code: "INR",
-        symbol: "₹",
-        locale: "en-IN",
+    return NextResponse.json(
+      {
+        products: formattedProducts,
+        currency: {
+          code: "INR",
+          symbol: "₹",
+          locale: "en-IN",
+        },
       },
-    });
-  } catch (error) {
-    console.error(
-      "Admin products GET:",
-      error
+      {
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      }
     );
+  } catch (error) {
+    console.error("Admin products GET:", error);
 
     return NextResponse.json(
       {
-        error: "Failed to load products",
+        error: "Failed to load products.",
       },
       {
         status: 500,
@@ -258,10 +327,10 @@ export async function GET(request: Request) {
   }
 }
 
-/**
- * POST
- * Create new product
- */
+/* =========================================================
+   POST — CREATE PRODUCT WITH MULTIPLE CATEGORIES
+========================================================= */
+
 export async function POST(request: Request) {
   const auth = await requireAuth(["ADMIN"]);
 
@@ -275,58 +344,70 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    /* -----------------------------------------
+    /* -----------------------------------------------------
        BASIC PRODUCT DATA
-    ----------------------------------------- */
+    ----------------------------------------------------- */
 
-    const name =
-      String(body.name || "").trim();
+    const name = String(body.name || "").trim();
 
-    const modelNumber =
-      String(body.modelNumber || "")
-        .trim()
-        .toUpperCase();
+    const modelNumber = String(body.modelNumber || "")
+      .trim()
+      .toUpperCase();
 
-    const sku =
-      String(body.sku || "")
-        .trim()
-        .toUpperCase();
+    const sku = String(body.sku || "")
+      .trim()
+      .toUpperCase();
 
-    const description =
-      String(body.description || "").trim();
+    const description = String(body.description || "").trim();
 
-    const categoryId =
-      String(body.categoryId || "").trim();
+    const brand = body.brand
+      ? String(body.brand).trim()
+      : null;
 
-    const brand =
-      body.brand
-        ? String(body.brand).trim()
-        : null;
+    /*
+     * Multi-category support:
+     * The updated admin form sends categoryIds: string[].
+     *
+     * categoryId is still accepted for compatibility with
+     * older clients and existing database relationships.
+     */
+    const submittedCategoryIds = getUniqueIds(body.categoryIds);
 
-    /* -----------------------------------------
+    const legacyCategoryId = String(
+      body.categoryId || ""
+    ).trim();
+
+    const categoryIds = Array.from(
+      new Set([
+        ...submittedCategoryIds,
+        ...(legacyCategoryId ? [legacyCategoryId] : []),
+      ])
+    );
+
+    /*
+     * Keep the first selected category in the legacy
+     * Product.categoryId field.
+     *
+     * The full selection will also be saved in
+     * ProductCategory below.
+     */
+    const categoryId = categoryIds[0] || "";
+
+    /* -----------------------------------------------------
        PRICE
-       INR / ₹
-    ----------------------------------------- */
+    ----------------------------------------------------- */
 
-    const basePrice =
-      asNonNegativeNumber(body.basePrice, 0);
+    const basePrice = asNonNegativeNumber(body.basePrice, 0);
 
     const discountPercent = Math.min(
       100,
-      Math.max(
-        0,
-        asFiniteNumber(
-          body.discountPercent,
-          0
-        )
-      )
+      Math.max(0, asFiniteNumber(body.discountPercent, 0))
     );
 
-    const discountedPrice =
-      calculateDiscountedPrice(
-        basePrice,
-        discountPercent
-      );
+    const discountedPrice = calculateDiscountedPrice(
+      basePrice,
+      discountPercent
+    );
 
     let comparePrice: number | null = null;
 
@@ -335,28 +416,21 @@ export async function POST(request: Request) {
       body.comparePrice !== undefined &&
       body.comparePrice !== ""
     ) {
-      comparePrice =
-        asNonNegativeNumber(
-          body.comparePrice,
-          0
-        );
+      comparePrice = asNonNegativeNumber(
+        body.comparePrice,
+        0
+      );
     }
 
-    /* -----------------------------------------
+    /* -----------------------------------------------------
        VALIDATION
-    ----------------------------------------- */
+    ----------------------------------------------------- */
 
-    if (
-      !name ||
-      !modelNumber ||
-      !sku ||
-      !description ||
-      !categoryId
-    ) {
+    if (!name || !modelNumber || !sku || !description) {
       return NextResponse.json(
         {
           error:
-            "Name, model number, SKU, description and category are required.",
+            "Name, model number, SKU and description are required.",
         },
         {
           status: 400,
@@ -364,10 +438,18 @@ export async function POST(request: Request) {
       );
     }
 
-    if (
-      !Number.isFinite(basePrice) ||
-      basePrice < 0
-    ) {
+    if (categoryIds.length === 0) {
+      return NextResponse.json(
+        {
+          error: "Select at least one product category.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (!Number.isFinite(basePrice) || basePrice < 0) {
       return NextResponse.json(
         {
           error: "Invalid base price.",
@@ -379,6 +461,7 @@ export async function POST(request: Request) {
     }
 
     if (
+      !Number.isFinite(discountPercent) ||
       discountPercent < 0 ||
       discountPercent > 100
     ) {
@@ -393,25 +476,44 @@ export async function POST(request: Request) {
       );
     }
 
-    /* -----------------------------------------
-       CATEGORY
-    ----------------------------------------- */
+    /* -----------------------------------------------------
+       VALIDATE ALL SELECTED CATEGORIES
+    ----------------------------------------------------- */
 
-    const category =
-      await prisma.category.findUnique({
-        where: {
-          id: categoryId,
+    const categories = await prisma.category.findMany({
+      where: {
+        id: {
+          in: categoryIds,
         },
-        select: {
-          id: true,
-          name: true,
-        },
-      });
+        isActive: true,
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+      },
+    });
 
-    if (!category) {
+    /*
+     * Reject the request if any selected category does not
+     * exist or has been deactivated.
+     *
+     * This prevents invalid ProductCategory references.
+     */
+    if (categories.length !== categoryIds.length) {
+      const foundIds = new Set(
+        categories.map((category) => category.id)
+      );
+
+      const invalidCategoryIds = categoryIds.filter(
+        (id) => !foundIds.has(id)
+      );
+
       return NextResponse.json(
         {
-          error: "Category not found.",
+          error:
+            "One or more selected categories do not exist or are inactive.",
+          invalidCategoryIds,
         },
         {
           status: 400,
@@ -419,28 +521,26 @@ export async function POST(request: Request) {
       );
     }
 
-    /* -----------------------------------------
-       UNIQUE MODEL / SKU
-    ----------------------------------------- */
+    /* -----------------------------------------------------
+       UNIQUE MODEL NUMBER / SKU
+    ----------------------------------------------------- */
 
-    const existing =
-      await prisma.product.findFirst({
-        where: {
-          OR: [
-            {
-              modelNumber,
-            },
-            {
-              sku,
-            },
-          ],
-        },
-
-        select: {
-          modelNumber: true,
-          sku: true,
-        },
-      });
+    const existing = await prisma.product.findFirst({
+      where: {
+        OR: [
+          {
+            modelNumber,
+          },
+          {
+            sku,
+          },
+        ],
+      },
+      select: {
+        modelNumber: true,
+        sku: true,
+      },
+    });
 
     if (existing) {
       return NextResponse.json(
@@ -456,9 +556,9 @@ export async function POST(request: Request) {
       );
     }
 
-    /* -----------------------------------------
-       SLUG
-    ----------------------------------------- */
+    /* -----------------------------------------------------
+       GENERATE UNIQUE SLUG
+    ----------------------------------------------------- */
 
     let slug = slugify(name);
 
@@ -466,554 +566,447 @@ export async function POST(request: Request) {
       slug = `product-${modelNumber.toLowerCase()}`;
     }
 
-    const slugOwner =
-      await prisma.product.findUnique({
-        where: {
-          slug,
-        },
-        select: {
-          id: true,
-        },
-      });
+    const slugOwner = await prisma.product.findUnique({
+      where: {
+        slug,
+      },
+      select: {
+        id: true,
+      },
+    });
 
     if (slugOwner) {
       const modelSlug = modelNumber
         .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-");
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
 
       slug = `${slug}-${modelSlug}`;
     }
 
-    /* -----------------------------------------
+    /*
+     * A second collision check is still handled by Prisma's
+     * unique-constraint error handler below.
+     */
+
+    /* -----------------------------------------------------
        TAGS / SPECIFICATIONS
-    ----------------------------------------- */
+    ----------------------------------------------------- */
 
-    const tags =
-      parseStringArray(body.tags);
+    const tags = parseStringArray(body.tags);
 
-    const specifications =
-      parseJsonObject(
-        body.specifications
-      );
+    const specifications = parseJsonObject(
+      body.specifications
+    );
 
-    /* -----------------------------------------
-       STOCK
-    ----------------------------------------- */
+    /* -----------------------------------------------------
+       INVENTORY
+    ----------------------------------------------------- */
 
-    const stock =
-      Math.floor(
-        asNonNegativeNumber(
-          body.stock,
-          0
-        )
-      );
+    const stock = Math.floor(
+      asNonNegativeNumber(body.stock, 0)
+    );
 
-    const lowStockThreshold =
-      Math.floor(
-        asNonNegativeNumber(
-          body.lowStockThreshold,
-          10
-        )
-      );
+    const lowStockThreshold = Math.floor(
+      asNonNegativeNumber(body.lowStockThreshold, 10)
+    );
 
-    /* -----------------------------------------
-       MEDIA DATA
-       Supports URLs sent by the current
-       admin UI/API. Actual file-upload
-       storage can be connected later.
-    ----------------------------------------- */
+    /* -----------------------------------------------------
+       MEDIA INPUT
+    ----------------------------------------------------- */
 
-    const productImages: unknown[] =
-      Array.isArray(body.images)
-        ? body.images
-        : [];
+    const productImages: unknown[] = Array.isArray(body.images)
+      ? body.images
+      : [];
 
-    const productVideos: unknown[] =
-      Array.isArray(body.productVideos)
-        ? body.productVideos
-        : Array.isArray(body.videos)
+    const productVideos: unknown[] = Array.isArray(
+      body.productVideos
+    )
+      ? body.productVideos
+      : Array.isArray(body.videos)
         ? body.videos
         : [];
 
-    /* -----------------------------------------
+    /* -----------------------------------------------------
        GLASS CONFIGURATION
-    ----------------------------------------- */
+    ----------------------------------------------------- */
 
-    const glassOptionIds =
-      Array.isArray(body.glassOptionIds)
-        ? body.glassOptionIds
-            .map((value: unknown) =>
-              String(value).trim()
-            )
-            .filter(Boolean)
-        : [];
+    const glassOptionIds = getUniqueIds(body.glassOptionIds);
 
-    /* -----------------------------------------
-       CREATE PRODUCT
-       Transaction prevents partially-created
-       product records.
-    ----------------------------------------- */
+    /* -----------------------------------------------------
+       CREATE PRODUCT AND RELATIONS TRANSACTIONALLY
+    ----------------------------------------------------- */
 
-    const result =
-      await prisma.$transaction(
-        async (tx) => {
-          const product =
-            await tx.product.create({
-              data: {
-                name,
-                modelNumber,
+    const result = await prisma.$transaction(async (tx) => {
+      /* -----------------------------------------------
+         1. CREATE PRODUCT
+      ----------------------------------------------- */
 
-                brand,
+      const product = await tx.product.create({
+        data: {
+          name,
+          modelNumber,
+          brand,
+          slug,
 
-                slug,
+          headline: body.headline
+            ? String(body.headline).trim()
+            : null,
 
-                headline:
-                  body.headline
-                    ? String(
-                        body.headline
-                      ).trim()
-                    : null,
+          description,
+          basePrice,
+          discountPercent,
+          comparePrice,
+          sku,
 
-                description,
+          /*
+           * Legacy relation:
+           * Keep this field populated for older parts of
+           * the storefront that still use categoryId.
+           */
+          categoryId,
 
-                basePrice,
+          isFeatured: Boolean(body.isFeatured),
+          isNew: Boolean(body.isNew),
+          isPublished: Boolean(body.isPublished),
 
-                discountPercent,
+          frameShape: String(
+            body.frameShape || "Geometric"
+          ),
 
-                comparePrice,
+          frameMaterial: String(
+            body.frameMaterial || "Grade 5 Titanium"
+          ),
 
-                sku,
+          lensMaterial: String(
+            body.lensMaterial ||
+              "Polycarbonate UV400 Polarized"
+          ),
 
-                categoryId,
+          lensWidthMm: asFiniteNumber(
+            body.lensWidthMm,
+            53
+          ),
 
-                isFeatured:
-                  Boolean(
-                    body.isFeatured
-                  ),
+          bridgeWidthMm: asFiniteNumber(
+            body.bridgeWidthMm,
+            18
+          ),
 
-                isNew:
-                  Boolean(
-                    body.isNew
-                  ),
+          templeLengthMm: asFiniteNumber(
+            body.templeLengthMm,
+            145
+          ),
 
-                isPublished:
-                  Boolean(
-                    body.isPublished
-                  ),
+          totalWeightG: asFiniteNumber(
+            body.totalWeightG,
+            18
+          ),
 
-                frameShape:
-                  String(
-                    body.frameShape ||
-                      "Geometric"
-                  ),
+          genderStyle: String(
+            body.genderStyle || "Unisex"
+          ),
 
-                frameMaterial:
-                  String(
-                    body.frameMaterial ||
-                      "Grade 5 Titanium"
-                  ),
+          gsm:
+            body.gsm === null ||
+            body.gsm === undefined ||
+            body.gsm === ""
+              ? null
+              : Math.max(
+                  0,
+                  Math.floor(
+                    asFiniteNumber(body.gsm, 0)
+                  )
+                ),
 
-                lensMaterial:
-                  String(
-                    body.lensMaterial ||
-                      "Polycarbonate UV400 Polarized"
-                  ),
+          specifications: JSON.stringify(specifications),
+          tags: JSON.stringify(tags),
 
-                lensWidthMm:
-                  asFiniteNumber(
-                    body.lensWidthMm,
-                    53
-                  ),
+          seoTitle: body.seoTitle
+            ? String(body.seoTitle).trim()
+            : null,
 
-                bridgeWidthMm:
-                  asFiniteNumber(
-                    body.bridgeWidthMm,
-                    18
-                  ),
+          seoDescription: body.seoDescription
+            ? String(body.seoDescription).trim()
+            : null,
 
-                templeLengthMm:
-                  asFiniteNumber(
-                    body.templeLengthMm,
-                    145
-                  ),
+          releaseDate: asDate(body.releaseDate),
+          publishedAt: asDate(body.publishedAt),
 
-                totalWeightG:
-                  asFiniteNumber(
-                    body.totalWeightG,
-                    18
-                  ),
+          inventory: {
+            create: {
+              available: stock,
+              reserved: 0,
+              sold: 0,
+              lowStockThreshold,
+            },
+          },
+        },
 
-                genderStyle:
-                  String(
-                    body.genderStyle ||
-                      "Unisex"
-                  ),
+        include: {
+          category: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+            },
+          },
 
-                gsm:
-                  body.gsm === null ||
-                  body.gsm === undefined ||
-                  body.gsm === ""
-                    ? null
-                    : Math.max(
-                        0,
-                        Math.floor(
-                          asFiniteNumber(
-                            body.gsm,
-                            0
-                          )
-                        )
-                      ),
+          inventory: true,
+        },
+      });
 
-                specifications:
-                  JSON.stringify(
-                    specifications
-                  ),
+      /* -----------------------------------------------
+         2. SAVE MULTIPLE CATEGORY RELATIONS
+      ----------------------------------------------- */
 
-                tags:
-                  JSON.stringify(tags),
+      /*
+       * This is the main change.
+       *
+       * Every selected category gets a ProductCategory
+       * relation. The unique constraint on
+       * (productId, categoryId) prevents duplicate pairs.
+       *
+       * The product and category relations are saved inside
+       * the same transaction as the product itself.
+       */
 
-                seoTitle:
-                  body.seoTitle
-                    ? String(
-                        body.seoTitle
-                      ).trim()
-                    : null,
-
-                seoDescription:
-                  body.seoDescription
-                    ? String(
-                        body.seoDescription
-                      ).trim()
-                    : null,
-
-                releaseDate:
-                  asDate(
-                    body.releaseDate
-                  ),
-
-                publishedAt:
-                  asDate(
-                    body.publishedAt
-                  ),
-
-                inventory: {
-                  create: {
-                    available: stock,
-                    reserved: 0,
-                    sold: 0,
-                    lowStockThreshold,
-                  },
-                },
-              },
-
-              include: {
-                category: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-
-                inventory: true,
-              },
-            });
-
-          /* -------------------------------------
-             GLASS LINKS
-          ------------------------------------- */
-
-          if (
-            glassOptionIds.length
-          ) {
-            const validGlasses =
-              await tx.glassOption.findMany(
-                {
-                  where: {
-                    id: {
-                      in: glassOptionIds,
-                    },
-
-                    isActive: true,
-                  },
-
-                  select: {
-                    id: true,
-                  },
-                }
-              );
-
-            if (
-              validGlasses.length
-            ) {
-              await tx.productGlass.createMany(
-                {
-                  data:
-                    validGlasses.map(
-                      (
-                        glass: { id: string },
-                        index: number
-                      ) => ({
-                        productId:
-                          product.id,
-
-                        glassId:
-                          glass.id,
-
-                        isDefault:
-                          index === 0,
-                      })
-                    ),
-
-                  skipDuplicates:
-                    true,
-                }
-              );
-            }
-          }
-
-          /* -------------------------------------
-             PRODUCT VIDEOS
-          ------------------------------------- */
-
- const videoData = productVideos
-  .map(
-    (
-      video: unknown,
-      index: number
-    ) => {
-      if (
-        typeof video === "string" &&
-        video.trim()
-      ) {
-        return {
+      await tx.productCategory.createMany({
+        data: categoryIds.map((selectedCategoryId) => ({
           productId: product.id,
-          url: video.trim(),
-          displayOrder: index,
-          isBackground: index === 0,
-          autoplay: true,
-          loop: true,
-          muted: true,
-        };
+          categoryId: selectedCategoryId,
+        })),
+        skipDuplicates: true,
+      });
+
+      /* -----------------------------------------------
+         3. SAVE GLASS OPTION LINKS
+      ----------------------------------------------- */
+
+      if (glassOptionIds.length > 0) {
+        const validGlasses = await tx.glassOption.findMany({
+          where: {
+            id: {
+              in: glassOptionIds,
+            },
+            isActive: true,
+          },
+          select: {
+            id: true,
+          },
+        });
+
+        if (validGlasses.length > 0) {
+          await tx.productGlass.createMany({
+            data: validGlasses.map(
+              (glass: { id: string }, index: number) => ({
+                productId: product.id,
+                glassId: glass.id,
+                isDefault: index === 0,
+              })
+            ),
+            skipDuplicates: true,
+          });
+        }
       }
 
-      if (
-        video &&
-        typeof video === "object"
-      ) {
-        const item = video as Record<
-          string,
-          unknown
-        >;
+      /* -----------------------------------------------
+         4. SAVE PRODUCT VIDEOS
+      ----------------------------------------------- */
 
-        const url = String(
-          item.url || ""
-        ).trim();
+      const videoData = productVideos
+        .map((video: unknown, index: number) => {
+          if (
+            typeof video === "string" &&
+            video.trim()
+          ) {
+            return {
+              productId: product.id,
+              url: video.trim(),
+              displayOrder: index,
+              isBackground: index === 0,
+              autoplay: true,
+              loop: true,
+              muted: true,
+            };
+          }
 
-        if (!url) {
+          if (
+            video &&
+            typeof video === "object"
+          ) {
+            const item = video as Record<string, unknown>;
+
+            const videoUrl = String(
+              item.url || ""
+            ).trim();
+
+            if (!videoUrl) {
+              return null;
+            }
+
+            const suppliedDisplayOrder = Number(
+              item.displayOrder
+            );
+
+            return {
+              productId: product.id,
+              url: videoUrl,
+
+              posterUrl: item.posterUrl
+                ? String(item.posterUrl).trim()
+                : null,
+
+              title: item.title
+                ? String(item.title).trim()
+                : null,
+
+              displayOrder: Number.isFinite(
+                suppliedDisplayOrder
+              )
+                ? suppliedDisplayOrder
+                : index,
+
+              isBackground:
+                item.isBackground === undefined
+                  ? index === 0
+                  : Boolean(item.isBackground),
+
+              autoplay:
+                item.autoplay === undefined
+                  ? true
+                  : Boolean(item.autoplay),
+
+              loop:
+                item.loop === undefined
+                  ? true
+                  : Boolean(item.loop),
+
+              muted:
+                item.muted === undefined
+                  ? true
+                  : Boolean(item.muted),
+            };
+          }
+
           return null;
-        }
+        })
+        .filter(
+          (
+            item
+          ): item is NonNullable<typeof item> =>
+            item !== null
+        );
 
-        return {
-          productId: product.id,
-          url,
-
-          posterUrl: item.posterUrl
-            ? String(item.posterUrl).trim()
-            : null,
-
-          title: item.title
-            ? String(item.title).trim()
-            : null,
-
-          displayOrder: Number.isFinite(
-            Number(item.displayOrder)
-          )
-            ? Number(item.displayOrder)
-            : index,
-
-          isBackground:
-            item.isBackground === undefined
-              ? index === 0
-              : Boolean(item.isBackground),
-
-          autoplay:
-            item.autoplay === undefined
-              ? true
-              : Boolean(item.autoplay),
-
-          loop:
-            item.loop === undefined
-              ? true
-              : Boolean(item.loop),
-
-          muted:
-            item.muted === undefined
-              ? true
-              : Boolean(item.muted),
-        };
+      if (videoData.length > 0) {
+        await tx.productVideo.createMany({
+          data: videoData,
+        });
       }
 
-      return null;
-    }
-  )
-  .filter(
-    (
-      item
-    ): item is NonNullable<typeof item> =>
-      item !== null
-  );
+      /* -----------------------------------------------
+         5. SAVE PRODUCT IMAGES
+      ----------------------------------------------- */
 
-if (videoData.length > 0) {
-  await tx.productVideo.createMany({
-    data: videoData,
-  });
-}
-          /* -------------------------------------
-             PRODUCT IMAGES
-             
-             Only create image records when
-             the current Prisma ProductImage
-             relation accepts the expected
-             fields.
-          ------------------------------------- */
-
-          if (
-            productImages.length
-          ) {
-            const imageData =
-              productImages
-                .map(
-                  (
-                    image: unknown,
-                    index: number
-                  ) => {
-                    if (
-                      typeof image ===
-                        "string" &&
-                      image.trim()
-                    ) {
-                      return {
-                        productId:
-                          product.id,
-
-                        url: image.trim(),
-
-                        displayOrder:
-                          index,
-
-                        isPrimary:
-                          index === 0,
-                      };
-                    }
-
-                    if (
-                      image &&
-                      typeof image ===
-                        "object"
-                    ) {
-                      const item =
-                        image as Record<
-                          string,
-                          unknown
-                        >;
-
-                      const url =
-                        String(
-                          item.url ||
-                            ""
-                        ).trim();
-
-                      if (!url) {
-                        return null;
-                      }
-
-                      return {
-                        productId:
-                          product.id,
-
-                        url,
-
-                        displayOrder:
-                          Number.isFinite(
-                            Number(
-                              item.displayOrder
-                            )
-                          )
-                            ? Number(
-                                item.displayOrder
-                              )
-                            : index,
-
-                        isPrimary:
-                          item.isPrimary ===
-                          undefined
-                            ? index === 0
-                            : Boolean(
-                                item.isPrimary
-                              ),
-                      };
-                    }
-
-                    return null;
-                  }
-                )
-                .filter(
-                  (
-                    item
-                  ): item is NonNullable<
-                    typeof item
-                  > => item !== null
-                );
+      if (productImages.length > 0) {
+        const imageData = productImages
+          .map((image: unknown, index: number) => {
+            if (
+              typeof image === "string" &&
+              image.trim()
+            ) {
+              return {
+                productId: product.id,
+                url: image.trim(),
+                displayOrder: index,
+                isPrimary: index === 0,
+              };
+            }
 
             if (
-              imageData.length
+              image &&
+              typeof image === "object"
             ) {
-              await tx.productImage.createMany(
-                {
-                  data: imageData,
-                }
+              const item = image as Record<string, unknown>;
+
+              const imageUrl = String(
+                item.url || ""
+              ).trim();
+
+              if (!imageUrl) {
+                return null;
+              }
+
+              const suppliedDisplayOrder = Number(
+                item.displayOrder
               );
+
+              return {
+                productId: product.id,
+                url: imageUrl,
+
+                displayOrder: Number.isFinite(
+                  suppliedDisplayOrder
+                )
+                  ? suppliedDisplayOrder
+                  : index,
+
+                isPrimary:
+                  item.isPrimary === undefined
+                    ? index === 0
+                    : Boolean(item.isPrimary),
+              };
             }
-          }
 
-          return product;
+            return null;
+          })
+          .filter(
+            (
+              item
+            ): item is NonNullable<typeof item> =>
+              item !== null
+          );
+
+        if (imageData.length > 0) {
+          await tx.productImage.createMany({
+            data: imageData,
+          });
         }
-      );
+      }
 
-    /* -----------------------------------------
-       AUDIT
-    ----------------------------------------- */
+      /* -----------------------------------------------
+         6. RETURN CREATED PRODUCT
+      ----------------------------------------------- */
+
+      return product;
+    });
+
+    /* -----------------------------------------------------
+       AUDIT LOG
+    ----------------------------------------------------- */
 
     await prisma.auditLog
       .create({
         data: {
           actorId: auth.user.id,
+          action: "PRODUCT_CREATED",
+          entityType: "Product",
+          entityId: result.id,
 
-          action:
-            "PRODUCT_CREATED",
-
-          entityType:
-            "Product",
-
-          entityId:
-            result.id,
-
-          details:
-            JSON.stringify({
-              modelNumber,
-              sku,
-              basePrice,
-              discountPercent,
-              discountedPrice,
-              currency: "INR",
-              currencySymbol: "₹",
-              stock,
-              glassOptionIds,
-              imageCount:
-                productImages.length,
-              videoCount:
-                productVideos.length,
-            }),
+          details: JSON.stringify({
+            modelNumber,
+            sku,
+            basePrice,
+            discountPercent,
+            discountedPrice,
+            currency: "INR",
+            currencySymbol: "₹",
+            stock,
+            categoryIds,
+            glassOptionIds,
+            imageCount: productImages.length,
+            videoCount: productVideos.length,
+          }),
         },
       })
       .catch((auditError) => {
@@ -1023,13 +1016,16 @@ if (videoData.length > 0) {
         );
       });
 
-    /* -----------------------------------------
+    /* -----------------------------------------------------
        RESPONSE
-    ----------------------------------------- */
+    ----------------------------------------------------- */
 
     return NextResponse.json(
       {
-        product: result,
+        product: {
+          ...result,
+          categoryIds,
+        },
 
         pricing: {
           currency: "INR",
@@ -1040,22 +1036,23 @@ if (videoData.length > 0) {
           discountedPrice,
         },
 
-        message:
-          "Product created successfully.",
+        message: "Product created successfully.",
       },
       {
         status: 201,
+        headers: {
+          "Cache-Control": "no-store",
+        },
       }
     );
-  } catch (error: any) {
-    console.error(
-      "Admin products POST:",
-      error
-    );
+  } catch (error: unknown) {
+    console.error("Admin products POST:", error);
 
-    if (
-      error?.code === "P2002"
-    ) {
+    const prismaError = error as {
+      code?: string;
+    };
+
+    if (prismaError?.code === "P2002") {
       return NextResponse.json(
         {
           error:
@@ -1067,9 +1064,7 @@ if (videoData.length > 0) {
       );
     }
 
-    if (
-      error?.code === "P2003"
-    ) {
+    if (prismaError?.code === "P2003") {
       return NextResponse.json(
         {
           error:
@@ -1083,8 +1078,9 @@ if (videoData.length > 0) {
 
     return NextResponse.json(
       {
-        error:
-          "Failed to create product.",
+        error: "Failed to create product.",
+        // Keep technical details in server logs, not the API
+        // response sent to the browser.
       },
       {
         status: 500,

@@ -1,0 +1,18 @@
+ .env                                               |   28 [31m-[m
+ .gitignore                                         |   35 [32m+[m[31m-[m
+ .../migration.sql                                  |  363 [32m++++++[m
+ prisma/schema.prisma                               |  132 [32m+[m[31m-[m
+ scripts/bootstrap-super-admin.mjs                  |   93 [32m++[m
+ scripts/check-super-admin.mjs                      |   42 [32m+[m
+ src/app/admin/AdminShell.tsx                       |  234 [32m+++[m[31m-[m
+ src/app/admin/categories/page.tsx                  | 1101 [32m++++++++++++++++[m
+ src/app/admin/products/page.tsx                    |  330 [32m+++[m[31m--[m
+ src/app/api/admin/categories/[id]/route.ts         |  400 [32m++++++[m
+ src/app/api/admin/categories/route.ts              |  339 [32m+++++[m
+ src/app/api/admin/products/[id]/route.ts           |  929 [32m+++++++++++++[m[31m-[m
+ src/app/api/admin/products/route.ts                | 1314 [32m++++++++++[m[31m----------[m
+ src/app/api/auth/login/route.ts                    |   59 [32m+[m[31m-[m
+ src/app/api/products/route.ts                      |  239 [32m+++[m[31m-[m
+ src/app/products/page.tsx                          |  783 [32m+++++++++[m[31m---[m
+ src/components/layout/Navbar.tsx                   |  446 [32m+++++[m[31m--[m
+ 17 files changed, 5626 insertions(+), 1241 deletions(-)

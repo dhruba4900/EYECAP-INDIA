@@ -16,6 +16,7 @@ import {
   ExternalLink,
   ImagePlus,
   Package,
+  Pencil,
   Percent,
   Plus,
   RefreshCw,
@@ -29,6 +30,7 @@ type Category = {
   id: string;
   name: string;
   slug?: string;
+  isActive?: boolean;
 };
 
 type Glass = {
@@ -55,6 +57,31 @@ type Product = {
     id: string;
     name: string;
   } | null;
+  productCategories?: {
+    categoryId?: string;
+    category?: { id: string; name?: string } | null;
+  }[];
+  brand?: string | null;
+  headline?: string | null;
+  description?: string;
+  specifications?: string | Record<string, unknown> | null;
+  tags?: string | string[] | null;
+  seoTitle?: string | null;
+  seoDescription?: string | null;
+  publishedAt?: string | Date | null;
+  releaseDate?: string | Date | null;
+  isFeatured?: boolean;
+  isNew?: boolean;
+  frameShape?: string | null;
+  frameMaterial?: string | null;
+  lensMaterial?: string | null;
+  lensWidthMm?: number | null;
+  bridgeWidthMm?: number | null;
+  templeLengthMm?: number | null;
+  totalWeightG?: number | null;
+  genderStyle?: string | null;
+  gsm?: number | null;
+  glassLinks?: { glassId?: string; glass?: { id: string } | null }[];
   inventory?: {
     available: number;
     reserved: number;
@@ -83,6 +110,7 @@ type ProductForm = {
   headline: string;
   description: string;
   categoryId: string;
+  categoryIds: string[];
 
   basePrice: string;
   discountPercent: string;
@@ -125,6 +153,7 @@ const emptyForm: ProductForm = {
   headline: "",
   description: "",
   categoryId: "",
+  categoryIds: [],
 
   basePrice: "",
   discountPercent: "0",
@@ -289,6 +318,7 @@ export default function AdminProductsPage() {
   const [saving, setSaving] = useState(false);
 
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -390,7 +420,7 @@ export default function AdminProductsPage() {
     try {
       const [categoryResponse, glassResponse] =
         await Promise.all([
-          fetch("/api/categories", {
+          fetch("/api/admin/categories", {
             cache: "no-store",
           }),
 
@@ -411,11 +441,20 @@ export default function AdminProductsPage() {
         setCategories(nextCategories);
 
         if (nextCategories.length > 0) {
-          setForm((current) => ({
-            ...current,
-            categoryId:
-              current.categoryId || nextCategories[0].id,
-          }));
+          setForm((current) => {
+            if (current.categoryIds.length > 0) {
+              return current;
+            }
+
+            const initialCategoryId =
+              current.categoryId || nextCategories.find((category) => category.isActive)?.id || "";
+
+            return {
+              ...current,
+              categoryId: initialCategoryId,
+              categoryIds: [initialCategoryId],
+            };
+          });
         }
       }
 
@@ -450,6 +489,7 @@ export default function AdminProductsPage() {
 
   function openCreate() {
     resetMessages();
+    setEditingProductId(null);
 
     setActiveTab("identity");
 
@@ -462,12 +502,113 @@ export default function AdminProductsPage() {
       )
     );
 
+    const initialCategoryId = categories.find((category) => category.isActive)?.id || "";
+
     setForm({
       ...emptyForm,
-      categoryId: categories[0]?.id || "",
+      categoryId: initialCategoryId,
+      categoryIds: initialCategoryId ? [initialCategoryId] : [],
     });
 
     setModalOpen(true);
+  }
+
+  function openEdit(product: Product) {
+    resetMessages();
+    setActiveTab("identity");
+    setSections(
+      Object.fromEntries(
+        tabs.map(([key]) => [key, key === "identity" || key === "pricing"])
+      )
+    );
+
+    const linkedCategoryIds = (product.productCategories || [])
+      .map((item) => item.categoryId || item.category?.id || "")
+      .filter(Boolean);
+    const categoryIds = Array.from(
+      new Set(linkedCategoryIds.length ? linkedCategoryIds : product.category?.id ? [product.category.id] : [])
+    );
+
+    const rawSpecifications = product.specifications;
+    const specifications = typeof rawSpecifications === "string"
+      ? rawSpecifications
+      : rawSpecifications && typeof rawSpecifications === "object"
+        ? JSON.stringify(rawSpecifications, null, 2)
+        : "{}";
+
+    let tagValues: string[] = [];
+    if (Array.isArray(product.tags)) {
+      tagValues = product.tags.map(String);
+    } else if (typeof product.tags === "string" && product.tags.trim()) {
+      try {
+        const parsedTags: unknown = JSON.parse(product.tags);
+        tagValues = Array.isArray(parsedTags) ? parsedTags.map(String) : product.tags.split(",");
+      } catch {
+        tagValues = product.tags.split(",");
+      }
+    }
+
+    const dateValue = (value: unknown, withTime = false): string => {
+      if (!value) return "";
+      const date = new Date(String(value));
+      if (Number.isNaN(date.getTime())) return "";
+      return withTime ? date.toISOString().slice(0, 16) : date.toISOString().slice(0, 10);
+    };
+
+    setForm({
+      ...emptyForm,
+      name: product.name || "",
+      modelNumber: product.modelNumber || "",
+      sku: product.sku || "",
+      brand: product.brand || "EYECAP",
+      headline: product.headline || "",
+      description: product.description || "",
+      categoryId: categoryIds[0] || product.category?.id || "",
+      categoryIds,
+      basePrice: String(product.basePrice ?? ""),
+      discountPercent: String(product.discountPercent ?? 0),
+      comparePrice: product.comparePrice == null ? "" : String(product.comparePrice),
+      frameShape: product.frameShape || "Geometric",
+      frameMaterial: product.frameMaterial || "Grade 5 Titanium",
+      lensMaterial: product.lensMaterial || "Polycarbonate UV400 Polarized",
+      gsm: product.gsm == null ? "" : String(product.gsm),
+      lensWidthMm: String(product.lensWidthMm ?? 53),
+      bridgeWidthMm: String(product.bridgeWidthMm ?? 18),
+      templeLengthMm: String(product.templeLengthMm ?? 145),
+      totalWeightG: String(product.totalWeightG ?? 18),
+      genderStyle: product.genderStyle || "Unisex",
+      stock: String(product.inventory?.available ?? 0),
+      lowStockThreshold: String(product.inventory?.lowStockThreshold ?? 10),
+      tags: tagValues.map((tag) => tag.trim()).filter(Boolean).join(", "),
+      specifications: specifications || "{}",
+      seoTitle: product.seoTitle || "",
+      seoDescription: product.seoDescription || "",
+      releaseDate: dateValue(product.releaseDate),
+      publishedAt: dateValue(product.publishedAt, true),
+      isPublished: Boolean(product.isPublished),
+      glassOptionIds: (product.glassLinks || [])
+        .map((item) => item.glassId || item.glass?.id || "")
+        .filter(Boolean),
+    });
+
+    setEditingProductId(product.id);
+    setModalOpen(true);
+  }
+
+  function toggleCategory(categoryId: string) {
+    setForm((current) => {
+      const alreadySelected = current.categoryIds.includes(categoryId);
+      const categoryIds = alreadySelected
+        ? current.categoryIds.filter((id) => id !== categoryId)
+        : [...current.categoryIds, categoryId];
+
+      return {
+        ...current,
+        categoryIds,
+        // Keep the legacy single-category field synchronized for compatibility.
+        categoryId: categoryIds[0] || "",
+      };
+    });
   }
 
   function toggleSection(key: string) {
@@ -519,8 +660,8 @@ export default function AdminProductsPage() {
       return "Product description is required.";
     }
 
-    if (!form.categoryId) {
-      return "Please select a product category.";
+    if (form.categoryIds.length === 0) {
+      return "Please select at least one product category.";
     }
 
     if (!Number.isFinite(price) || price < 0) {
@@ -662,6 +803,11 @@ export default function AdminProductsPage() {
         specifications:
           form.specifications.trim() || "{}",
 
+        // Keep the first selected category for legacy Product.categoryId consumers.
+        categoryId: form.categoryIds[0] || "",
+        // The admin API must persist these IDs through ProductCategory.
+        categoryIds: Array.from(new Set(form.categoryIds)),
+
         /*
          * IMPORTANT:
          * Glass selection was previously kept only in UI.
@@ -670,37 +816,45 @@ export default function AdminProductsPage() {
         glassOptionIds: form.glassOptionIds,
       };
 
-      const response = await fetch(
-        "/api/admin/products",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        }
-      );
+      const isEditing = Boolean(editingProductId);
+      const endpoint = isEditing
+        ? `/api/admin/products/${editingProductId}`
+        : "/api/admin/products";
+
+      const response = await fetch(endpoint, {
+        method: isEditing ? "PATCH" : "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
 
       const data = await response.json();
 
       if (!response.ok) {
         throw new Error(
           data.error ||
-            "Failed to create product"
+            (isEditing ? "Failed to update product" : "Failed to create product")
         );
       }
 
       const createdModelNumber = data.product?.modelNumber ?? "unknown";
 
       setMessage(
-        `Product ${createdModelNumber} created successfully.`
+        isEditing
+          ? `Product ${createdModelNumber} updated successfully.`
+          : `Product ${createdModelNumber} created successfully.`
       );
 
       setModalOpen(false);
+      setEditingProductId(null);
+
+      const initialCategoryId = categories.find((category) => category.isActive)?.id || "";
 
       setForm({
         ...emptyForm,
-        categoryId: categories[0]?.id || "",
+        categoryId: initialCategoryId,
+        categoryIds: initialCategoryId ? [initialCategoryId] : [],
       });
 
       setSelectedProductIds([]);
@@ -710,7 +864,9 @@ export default function AdminProductsPage() {
       setError(
         e instanceof Error
           ? e.message
-          : "Failed to create product"
+          : editingProductId
+            ? "Failed to update product"
+            : "Failed to create product"
       );
     } finally {
       setSaving(false);
@@ -1221,6 +1377,16 @@ export default function AdminProductsPage() {
 
                       <td className="px-4 py-4">
                         <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => openEdit(product)}
+                            className="rounded-lg border border-cyan-400/20 bg-cyan-400/5 p-2 text-cyan-300 transition hover:border-cyan-300/50 hover:bg-cyan-400/10"
+                            title={`Edit ${product.name}`}
+                            aria-label={`Edit ${product.name}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+
                           <Link
                             href={`/products/${product.slug}`}
                             target="_blank"
@@ -1253,7 +1419,7 @@ export default function AdminProductsPage() {
         </div>
       </div>
 
-      {/* CREATE PRODUCT MODAL */}
+      {/* CREATE / EDIT PRODUCT MODAL */}
       {modalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
           <div className="flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl border border-[#1d3d5a] bg-[#050d17] shadow-[0_30px_120px_rgba(0,0,0,.65)]">
@@ -1265,7 +1431,7 @@ export default function AdminProductsPage() {
                 </p>
 
                 <h2 className="mt-1 text-xl font-bold text-white">
-                  Create New Product
+                  {editingProductId ? "Edit Product" : "Create New Product"}
                 </h2>
               </div>
 
@@ -1368,51 +1534,73 @@ export default function AdminProductsPage() {
                         placeholder="EYECAP"
                       />
 
-                      <label className="block space-y-1.5 sm:col-span-2">
-                        <span className="text-[11px] font-medium uppercase tracking-wide text-slate-300">
-                          Category{" "}
-                          <span className="text-cyan-300">
-                            *
+                      <div className="space-y-2.5 sm:col-span-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="text-[11px] font-medium uppercase tracking-wide text-slate-300">
+                            Product categories{" "}
+                            <span className="text-cyan-300">*</span>
                           </span>
-                        </span>
+                          <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-2.5 py-1 text-[10px] font-semibold text-cyan-300">
+                            {form.categoryIds.length} selected
+                          </span>
+                        </div>
 
-                        <select
-                          required
-                          value={form.categoryId}
-                          onChange={(e) =>
-                            update(
-                              "categoryId",
-                              e.target.value
-                            )
-                          }
-                          className="w-full rounded-xl border border-[#203a56] bg-[#081321] px-3.5 py-3 text-sm text-white outline-none focus:border-cyan-400/70"
-                        >
-                          <option value="">
-                            Select category
-                          </option>
+                        <p className="text-[11px] leading-5 text-slate-500">
+                          Select one or more categories. A product can appear in every selected
+                          category on the storefront.
+                        </p>
 
-                          {categories.map(
-                            (category) => (
-                              <option
-                                key={category.id}
-                                value={category.id}
-                              >
-                                {category.name}
-                              </option>
-                            )
-                          )}
-                        </select>
+                        {metadataLoading ? (
+                          <div className="flex items-center gap-2 rounded-xl border border-[#203a56] bg-[#081321] p-4 text-xs text-slate-400">
+                            <RefreshCw className="h-4 w-4 animate-spin" />
+                            Loading categories…
+                          </div>
+                        ) : categories.length > 0 ? (
+                          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                            {categories.map((category) => {
+                              const selected = form.categoryIds.includes(category.id);
 
-                        {!metadataLoading &&
-                          categories.length ===
-                            0 && (
-                            <span className="block text-[10px] text-amber-300">
-                              No categories
-                              available. Create a
-                              category first.
-                            </span>
-                          )}
-                      </label>
+                              return (
+                                <label
+                                  key={category.id}
+                                  className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition ${
+                                    selected
+                                      ? "border-cyan-400/40 bg-cyan-400/10"
+                                      : "border-[#203a56] bg-[#081321] hover:border-[#315a7d]"
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={selected}
+                                    disabled={category.isActive === false && !selected}
+                                    onChange={() => toggleCategory(category.id)}
+                                    className="h-4 w-4 shrink-0 accent-cyan-400 disabled:cursor-not-allowed disabled:opacity-40"
+                                  />
+                                  <span className="min-w-0 flex-1 text-sm text-slate-200">
+                                    {category.name}
+                                    {category.isActive === false && (
+                                      <span className="ml-2 text-[9px] uppercase tracking-wide text-amber-300">Inactive</span>
+                                    )}
+                                  </span>
+                                  {selected && (
+                                    <Check className="h-4 w-4 shrink-0 text-cyan-300" />
+                                  )}
+                                </label>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <span className="block rounded-xl border border-amber-400/20 bg-amber-400/5 p-3 text-[11px] text-amber-300">
+                            No active categories are available. Create or activate a category first.
+                          </span>
+                        )}
+
+                        {form.categoryIds.length === 0 && (
+                          <span className="block text-[10px] text-amber-300">
+                            Select at least one category before saving this product.
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </Section>
 
@@ -2208,10 +2396,12 @@ export default function AdminProductsPage() {
                       )}
 
                       {saving
-                        ? "Creating…"
-                        : form.isPublished
-                          ? "Create & Publish"
-                          : "Save Draft"}
+                        ? editingProductId ? "Updating…" : "Creating…"
+                        : editingProductId
+                          ? "Save Changes"
+                          : form.isPublished
+                            ? "Create & Publish"
+                            : "Save Draft"}
                     </button>
                   </div>
                 </div>

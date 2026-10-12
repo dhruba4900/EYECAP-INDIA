@@ -5,6 +5,8 @@ import { requireAuth } from "@/lib/auth";
 import { deletePrivateObject, storePrivateObject } from "@/lib/object-storage";
 import { validateGlb } from "@/lib/validate-glb";
 
+export const dynamic = "force-dynamic";
+
 export const runtime = "nodejs";
 
 const MAX_GLB_BYTES = 20 * 1024 * 1024;

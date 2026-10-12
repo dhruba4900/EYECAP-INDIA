@@ -30,7 +30,7 @@ function LoginForm() {
     const res = await login(email, password);
     setLoading(false);
     if (res.success) {
-      router.push(redirect);
+      window.location.href = redirect;
     } else {
       setError(res.error || "Authentication failed");
     }

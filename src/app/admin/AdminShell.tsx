@@ -155,6 +155,15 @@ export default function AdminLayout({
       href: "/admin/audit-logs",
       icon: FileText,
     },
+    ...(user?.adminProfile?.isSuperAdmin
+      ? [
+          {
+            label: "Security Console",
+            href: "/security-console",
+            icon: Shield,
+          },
+        ]
+      : []),
   ];
 
   return (

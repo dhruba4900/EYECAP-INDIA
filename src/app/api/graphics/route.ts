@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { defaultGraphicsConfig, parseGraphicsConfig } from "@/lib/graphics";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     const record = await prisma.graphicsConfig.findUnique({ where: { id: "primary" } });

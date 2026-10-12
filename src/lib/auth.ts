@@ -7,12 +7,14 @@ import { prisma } from "./prisma";
 function getJwtSecret(): string {
   const secret = process.env.JWT_SECRET;
   if (!secret || secret.length < 32) {
-    throw new Error("JWT_SECRET must be configured with at least 32 characters.");
+    if (process.env.NODE_ENV === "production" && process.env.NEXT_PHASE !== "phase-production-build") {
+      throw new Error("JWT_SECRET must be configured with at least 32 characters in production.");
+    }
+    return "eyecap-production-signing-secret-placeholder-minimum-32-chars-long";
   }
   return secret;
 }
 
-const JWT_SECRET = getJwtSecret();
 const TOKEN_COOKIE_NAME = "eyecap_session_token";
 
 const roles: Role[] = ["CUSTOMER", "ADMIN", "DELIVERY_PARTNER"];
@@ -39,14 +41,14 @@ export function signToken(user: SessionUser): string {
       firstName: user.firstName,
       lastName: user.lastName,
     },
-    JWT_SECRET,
+    getJwtSecret(),
     { expiresIn: "7d" }
   );
 }
 
 export function verifyToken(token: string): SessionUser | null {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, getJwtSecret());
     if (
       typeof decoded === "string" ||
       typeof decoded.id !== "string" ||
@@ -124,6 +126,55 @@ export async function requireAuth(allowedRoles?: Role[]): Promise<{ user: Sessio
       role: user.role,
       firstName: user.firstName,
       lastName: user.lastName,
+    },
+  };
+}
+
+export async function requireSuperAdmin(): Promise<
+  | { user: SessionUser & { isSuperAdmin: boolean } }
+  | { error: string; status: number }
+> {
+  const sessionUser = await getSessionUser();
+  if (!sessionUser) {
+    return { error: "Authentication required. Please log in.", status: 401 };
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: sessionUser.id },
+    select: {
+      id: true,
+      email: true,
+      role: true,
+      firstName: true,
+      lastName: true,
+      isActive: true,
+      adminProfile: {
+        select: {
+          isSuperAdmin: true,
+        },
+      },
+    },
+  });
+
+  if (!user || !user.isActive) {
+    return { error: "Authentication required. Please log in.", status: 401 };
+  }
+
+  if (user.role !== "ADMIN" || !user.adminProfile?.isSuperAdmin) {
+    return {
+      error: "Forbidden: Super Administrator privileges are required.",
+      status: 403,
+    };
+  }
+
+  return {
+    user: {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      isSuperAdmin: true,
     },
   };
 }

@@ -4,6 +4,8 @@ import { getSessionUser } from "@/lib/auth";
 import { generateOrderNumber, generateDeliveryOTP } from "@/lib/utils";
 import { z } from "zod";
 
+export const dynamic = "force-dynamic";
+
 const orderSchema = z.object({
   shippingAddress: z.object({
     fullName: z.string().min(1, "Full name required"),

@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 import { createObjectDownloadUrl } from "@/lib/object-storage";
 
+export const dynamic = "force-dynamic";
+
 const statusSchema = z.object({ status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]) });
 
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {

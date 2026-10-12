@@ -3,6 +3,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+
 const safeUrlSchema = z.string().max(2048).refine(
   (value) => value.startsWith("/") && !value.startsWith("//") || /^https?:\/\//i.test(value),
   "Use a same-site path or an HTTP(S) URL"

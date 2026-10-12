@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 import { graphicsConfigSchema } from "@/lib/graphics";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(_request: Request, { params }: { params: { id: string } }) {
   const auth = await requireAuth(["ADMIN"]);
   if ("error" in auth) {

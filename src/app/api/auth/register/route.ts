@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { hashPassword, signToken, TOKEN_COOKIE_NAME } from "@/lib/auth";
 import { z } from "zod";
 
+export const dynamic = "force-dynamic";
+
 const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(12, "Password must be at least 12 characters"),

@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 import { defaultGraphicsConfig, graphicsConfigSchema, parseGraphicsConfig } from "@/lib/graphics";
 
+export const dynamic = "force-dynamic";
+
 async function ensureConfig() {
   return prisma.graphicsConfig.upsert({
     where: { id: "primary" },

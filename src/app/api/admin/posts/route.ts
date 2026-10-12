@@ -3,6 +3,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+
 const postSchema = z.object({
   title: z.string().trim().min(1).max(160),
   subtitle: z.string().max(300).nullable().optional(),

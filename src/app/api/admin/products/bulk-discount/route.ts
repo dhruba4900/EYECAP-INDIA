@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(request: Request) {
   const auth = await requireAuth(["ADMIN"]);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });

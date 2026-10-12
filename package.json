@@ -13,7 +13,8 @@
     "prisma:seed": "node --env-file-if-exists=.env scripts/seed.mjs",
     "setup": "npm run prisma:generate && npm run prisma:push && npm run prisma:seed",
     "db:categories": "node --env-file-if-exists=.env scripts/ensure-categories.mjs",
-    "test:flow": "node --env-file-if-exists=.env scripts/test-e2e-workflow.mjs"
+    "test:flow": "node --env-file-if-exists=.env scripts/test-e2e-workflow.mjs",
+    "test:category-navigation": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test tests/category-navigation.test.mts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1144.0",

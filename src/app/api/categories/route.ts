@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
       showInNavigation?: boolean;
     } = {};
 
-    if (!includeInactive) {
+    if (!includeInactive || isNavigation) {
       whereClause.isActive = true;
     }
 
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
       { categories: formatted },
       {
         headers: {
-          "Cache-Control": "public, s-maxage=0, must-revalidate",
+          "Cache-Control": "private, no-store, max-age=0, must-revalidate",
         },
       }
     );

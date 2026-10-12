@@ -16,213 +16,34 @@ import {
 
 import { useAuth } from "@/context/AuthContext";
 import { useCart } from "@/context/CartContext";
+import { usePublicCategories } from "@/context/PublicCategoryContext";
 import BrandLogo from "@/components/layout/BrandLogo";
+import {
+  buildCategoryNavigation,
+  type NavLink,
+} from "@/lib/category-navigation";
 
 /* ============================================================
    TYPES
 ============================================================ */
 
-type NavLink = {
-  label: string;
-  href: string;
-};
-
-type CategoryFromApi = {
-  id: string;
-  name: string;
-  slug: string;
-  isActive?: boolean;
-  showInNavigation?: boolean;
-  displayOrder?: number;
-};
-
-/* ============================================================
-   DEFAULT NAVIGATION
-   Used if the category API is temporarily unavailable.
-============================================================ */
-
-const DEFAULT_CATEGORY_LINKS: NavLink[] = [
-  {
-    label: "EYEGLASSES",
-    href: "/products?category=eyeglasses",
-  },
-  {
-    label: "SUNGLASSES",
-    href: "/products?category=sunglasses",
-  },
-  {
-    label: "CONTACT LENSES",
-    href: "/products?category=contact-lenses",
-  },
-  {
-    label: "SPECIAL POWER",
-    href: "/products?category=special-power",
-  },
-  {
-    label: "SPECIAL EDITIONS",
-    href: "/special-editions",
-  },
-];
-
 const STATIC_NAV_LINKS: NavLink[] = [
   {
+    key: "all-collections",
     label: "ALL COLLECTIONS",
     href: "/products",
   },
   {
+    key: "about",
     label: "ABOUT",
     href: "/about",
   },
   {
+    key: "support-and-care",
     label: "SUPPORT & CARE",
     href: "/support-and-care",
   },
 ];
-
-/* ============================================================
-   HELPERS
-============================================================ */
-
-function normalizeCategoryName(value: string): string {
-  return value
-    .toLowerCase()
-    .trim()
-    .replace(/&/g, "and")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
-function categoryHref(category: CategoryFromApi): string {
-  const normalizedName = normalizeCategoryName(category.name);
-  const normalizedSlug = normalizeCategoryName(category.slug);
-
-  if (
-    normalizedName === "special-editions" ||
-    normalizedSlug === "special-editions"
-  ) {
-    return "/special-editions";
-  }
-
-  return `/products?category=${encodeURIComponent(category.slug)}`;
-}
-
-function buildCategoryNavigation(
-  categories: CategoryFromApi[]
-): NavLink[] {
-  const eligibleCategories = categories.filter(
-    (category) =>
-      category.id &&
-      category.name?.trim() &&
-      category.slug?.trim() &&
-      category.isActive !== false &&
-      category.showInNavigation !== false
-  );
-
-  /*
-   * Sort by displayOrder while preserving the API order
-   * for categories with equal or missing displayOrder.
-   */
-  const sortedCategories = [...eligibleCategories].sort(
-    (a, b) =>
-      (a.displayOrder ?? 0) - (b.displayOrder ?? 0)
-  );
-
-  /*
-   * The built-in categories retain their familiar labels
-   * and order. Their actual URLs come from the database
-   * whenever matching category records exist.
-   */
-  const builtInDefinitions = [
-    {
-      key: "eyeglasses",
-      label: "EYEGLASSES",
-      aliases: ["eyeglasses", "eye-glasses", "eye glasses"],
-    },
-    {
-      key: "sunglasses",
-      label: "SUNGLASSES",
-      aliases: ["sunglasses", "sun-glasses", "sun glasses"],
-    },
-    {
-      key: "contact-lenses",
-      label: "CONTACT LENSES",
-      aliases: ["contact-lenses", "contact lenses"],
-    },
-    {
-      key: "special-power",
-      label: "SPECIAL POWER",
-      aliases: ["special-power", "special power"],
-    },
-    {
-      key: "special-editions",
-      label: "SPECIAL EDITIONS",
-      aliases: ["special-editions", "special editions"],
-    },
-  ];
-
-  const matchedBuiltInIds = new Set<string>();
-
-  const builtInLinks: NavLink[] = [];
-
-  for (const definition of builtInDefinitions) {
-    const matchingCategory = sortedCategories.find((category) => {
-      const normalizedName = normalizeCategoryName(category.name);
-      const normalizedSlug = normalizeCategoryName(category.slug);
-
-      return definition.aliases.some((alias) => {
-        const normalizedAlias = normalizeCategoryName(alias);
-
-        return (
-          normalizedName === normalizedAlias ||
-          normalizedSlug === normalizedAlias
-        );
-      });
-    });
-
-    if (matchingCategory) {
-      matchedBuiltInIds.add(matchingCategory.id);
-
-      builtInLinks.push({
-        label: definition.label,
-        href: categoryHref(matchingCategory),
-      });
-    }
-  }
-
-  /*
-   * Additional categories created in the Admin panel are
-   * appended after the built-in categories.
-   *
-   * Categories matching the built-in names are not shown
-   * a second time.
-   */
-  const customLinks = sortedCategories
-    .filter((category) => !matchedBuiltInIds.has(category.id))
-    .filter((category) => {
-      const normalizedName = normalizeCategoryName(category.name);
-      const normalizedSlug = normalizeCategoryName(category.slug);
-
-      const builtInNames = [
-        "eyeglasses",
-        "sunglasses",
-        "contact-lenses",
-        "special-power",
-        "special-editions",
-        "all-collections",
-      ];
-
-      return (
-        !builtInNames.includes(normalizedName) &&
-        !builtInNames.includes(normalizedSlug)
-      );
-    })
-    .map((category) => ({
-      label: category.name.toUpperCase(),
-      href: categoryHref(category),
-    }));
-
-  return [...builtInLinks, ...customLinks];
-}
 
 /* ============================================================
    NAVBAR
@@ -234,6 +55,7 @@ export default function Navbar() {
 
   const { user, logout } = useAuth();
   const { itemCount, setIsDrawerOpen } = useCart();
+  const { categories, loaded: categoriesLoaded } = usePublicCategories();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
@@ -245,12 +67,6 @@ export default function Navbar() {
     logoUrl: null,
     siteName: "EYECAP",
   });
-
-  const [categories, setCategories] = useState<CategoryFromApi[]>(
-    []
-  );
-
-  const [categoriesLoaded, setCategoriesLoaded] = useState(false);
 
   /* ============================================================
      BRANDING
@@ -278,93 +94,6 @@ export default function Navbar() {
   }, []);
 
   /* ============================================================
-     DYNAMIC CATEGORY NAVIGATION
-  ============================================================ */
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadCategories() {
-      try {
-        const response = await fetch(
-          "/api/categories?navigation=true",
-          {
-            method: "GET",
-            cache: "no-store",
-            headers: {
-              Accept: "application/json",
-            },
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error(
-            `Category request failed: ${response.status}`
-          );
-        }
-
-        const data: unknown = await response.json();
-
-        const payload = data as {
-          categories?: CategoryFromApi[];
-        };
-
-        if (!Array.isArray(payload.categories)) {
-          throw new Error(
-            "Invalid category response from server."
-          );
-        }
-
-        if (!cancelled) {
-          setCategories(payload.categories);
-          setCategoriesLoaded(true);
-        }
-      } catch (error) {
-        console.error(
-          "Navbar category loading failed:",
-          error
-        );
-
-        if (!cancelled) {
-          /*
-           * Keep the default category links available when
-           * the API cannot be reached.
-           */
-          setCategories([]);
-          setCategoriesLoaded(false);
-        }
-      }
-    }
-
-    void loadCategories();
-
-    /*
-     * Refresh category navigation when the tab becomes
-     * visible again. This helps reflect Admin changes
-     * without requiring a full page reload.
-     */
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        void loadCategories();
-      }
-    };
-
-    document.addEventListener(
-      "visibilitychange",
-      handleVisibilityChange
-    );
-
-    return () => {
-      cancelled = true;
-
-      document.removeEventListener(
-        "visibilitychange",
-        handleVisibilityChange
-      );
-    };
-  }, []);
-
-  /* ============================================================
      HIDE CUSTOMER NAVBAR ON ADMIN / DELIVERY
   ============================================================ */
 
@@ -381,7 +110,7 @@ export default function Navbar() {
 
   const categoryLinks = categoriesLoaded
     ? buildCategoryNavigation(categories)
-    : DEFAULT_CATEGORY_LINKS;
+    : [];
 
   const navLinks: NavLink[] = [
     STATIC_NAV_LINKS[0],
@@ -480,7 +209,7 @@ export default function Navbar() {
 
                   return (
                     <Link
-                      key={`${link.label}-${link.href}`}
+                      key={`desktop-${link.key}`}
                       href={link.href}
                       aria-current={active ? "page" : undefined}
                       className={`
@@ -658,7 +387,7 @@ export default function Navbar() {
 
                   return (
                     <Link
-                      key={`mobile-${link.label}-${link.href}`}
+                      key={`mobile-${link.key}`}
                       href={link.href}
                       onClick={handleMobileNavigation}
                       aria-current={active ? "page" : undefined}

@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { CartProvider } from "@/context/CartContext";
+import { PublicCategoryProvider } from "@/context/PublicCategoryContext";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import CartDrawer from "@/components/cart/CartDrawer";
@@ -33,13 +34,15 @@ export default function RootLayout({
       <body className="bg-eyecap-dark text-eyecap-light antialiased min-h-screen flex flex-col selection:bg-eyecap-cyan selection:text-black">
         <AuthProvider>
           <CartProvider>
-            <SiteBranding />
-            <Suspense fallback={null}>
-              <Navbar />
-            </Suspense>
-            <main className="flex-1">{children}</main>
-            <CartDrawer />
-            <Footer />
+            <PublicCategoryProvider>
+              <SiteBranding />
+              <Suspense fallback={null}>
+                <Navbar />
+              </Suspense>
+              <main className="flex-1">{children}</main>
+              <CartDrawer />
+              <Footer />
+            </PublicCategoryProvider>
           </CartProvider>
         </AuthProvider>
       </body>

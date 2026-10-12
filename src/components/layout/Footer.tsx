@@ -4,14 +4,24 @@ import React from "react";
 import Link from "next/link";
 import { ShieldCheck, Sparkles, Truck, RefreshCw, Award } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { usePublicCategories } from "@/context/PublicCategoryContext";
 import BrandLogo from "@/components/layout/BrandLogo";
+import {
+  getCategoryHref,
+  getEligibleNavigationCategories,
+} from "@/lib/category-navigation";
 
 export default function Footer() {
   const pathname = usePathname();
+  const { categories, loaded } = usePublicCategories();
 
   if (pathname.startsWith("/admin") || pathname.startsWith("/delivery")) {
     return null;
   }
+
+  const navigationCategories = loaded
+    ? getEligibleNavigationCategories(categories)
+    : [];
 
   const features = [
     {
@@ -75,10 +85,20 @@ export default function Footer() {
         <div>
           <h5 className="text-xs font-semibold uppercase tracking-wider text-white mb-4">Collections</h5>
           <ul className="space-y-2.5 text-xs text-eyecap-silver">
-            <li><Link href="/products?category=titanium-luxury" className="hover:text-white transition-colors">Titanium Luxury</Link></li>
-            <li><Link href="/products?category=sun-polarized" className="hover:text-white transition-colors">Sun & Polarized</Link></li>
-            <li><Link href="/products?category=blueblock-digital" className="hover:text-white transition-colors">BlueBlock Digital</Link></li>
-            <li><Link href="/products?category=cybertech-smart-audio" className="hover:text-white transition-colors">CyberTech Smart Audio</Link></li>
+            {navigationCategories.map((category) => (
+              <li key={category.id}>
+                <Link
+                  href={getCategoryHref(category)}
+                  className="hover:text-white transition-colors"
+                >
+                  {category.name
+                    .toLocaleLowerCase()
+                    .replace(/(^|\s)\S/g, (character) =>
+                      character.toLocaleUpperCase()
+                    )}
+                </Link>
+              </li>
+            ))}
             <li><Link href="/products" className="hover:text-white transition-colors">View All 24 Models</Link></li>
           </ul>
         </div>

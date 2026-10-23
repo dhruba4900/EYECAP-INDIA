@@ -779,7 +779,7 @@ export default function HomePage() {
 
   const isSectionEnabled = useCallback(
     (key: string) =>
-      getSection(key)?.isEnabled !== false,
+      getSection(key)?.isEnabled === true,
     [getSection],
   );
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense, useEffect, useMemo, useState } from "react";
+import React, { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Search,
@@ -81,10 +81,23 @@ function ProductsCatalog() {
   const [sort, setSort] = useState(searchParams.get("sort") || "featured");
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
-  // Keep the UI in sync when the user navigates with browser back/forward
-  // or opens a category URL directly.
+
+  // Keep URL and UI state synchronized without overwriting a newly
+  // navigated URL with stale filter state.
+  const searchParamsString = searchParams.toString();
+  const lastObservedSearchParams = useRef(searchParamsString);
+  const skipNextUrlSync = useRef(false);
+
+  // Read URL changes, including Navbar navigation and browser back/forward.
   useEffect(() => {
-    const params = new URLSearchParams(searchParams.toString());
+    if (lastObservedSearchParams.current === searchParamsString) {
+      return;
+    }
+
+    lastObservedSearchParams.current = searchParamsString;
+    skipNextUrlSync.current = true;
+
+    const params = new URLSearchParams(searchParamsString);
 
     setSearch(params.get("search") || "");
     setSelectedCategory(params.get("category") || "all");
@@ -92,12 +105,18 @@ function ProductsCatalog() {
     setMinPrice(readParam(params, "minPrice", DEFAULT_MIN_PRICE));
     setMaxPrice(readParam(params, "maxPrice", DEFAULT_MAX_PRICE));
     setSort(params.get("sort") || "featured");
+
     const pageValue = Number.parseInt(params.get("page") || "1", 10);
     setCurrentPage(Number.isFinite(pageValue) && pageValue > 0 ? pageValue : 1);
-  }, [searchParams]);
+  }, [searchParamsString]);
 
-  // Reflect filters in the URL so links can be copied and browser navigation works.
+  // Write filter state to the URL when the user changes filters.
   useEffect(() => {
+    if (skipNextUrlSync.current) {
+      skipNextUrlSync.current = false;
+      return;
+    }
+
     const params = new URLSearchParams();
 
     if (search.trim()) params.set("search", search.trim());
@@ -110,8 +129,8 @@ function ProductsCatalog() {
 
     const queryString = params.toString();
     const nextUrl = queryString ? `${pathname}?${queryString}` : pathname;
-    const currentUrl = searchParams.toString()
-      ? `${pathname}?${searchParams.toString()}`
+    const currentUrl = searchParamsString
+      ? `${pathname}?${searchParamsString}`
       : pathname;
 
     if (nextUrl !== currentUrl) {
@@ -127,8 +146,9 @@ function ProductsCatalog() {
     maxPrice,
     sort,
     currentPage,
-    searchParams,
+    searchParamsString,
   ]);
+
 
   // Load active categories from the category API. This includes admin-created
   // categories, so the catalogue does not need hard-coded category names.

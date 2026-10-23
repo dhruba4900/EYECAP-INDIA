@@ -10,7 +10,6 @@ export async function GET() {
     const [settings, sections, posts, popup, graphics] = await Promise.all([
       prisma.siteSettings.findUnique({ where: { id: "primary" } }),
       prisma.homepageSection.findMany({
-        where: { isEnabled: true },
         orderBy: { displayOrder: "asc" },
       }),
       prisma.post.findMany({
